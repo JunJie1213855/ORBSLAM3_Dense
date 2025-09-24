@@ -85,4 +85,4 @@ sh build.sh
 ./MyExample/stereoslam_disp --help
 ```
 
-对于上述代码的展示想过，可以根据链接[效果](https://zhuanlan.zhihu.com/p/694281711) 查看.
+对于上述代码的展示效果，可以根据链接[效果](https://zhuanlan.zhihu.com/p/694281711) 查看.
