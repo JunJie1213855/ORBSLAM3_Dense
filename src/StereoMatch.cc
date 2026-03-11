@@ -13,6 +13,42 @@ namespace ORB_SLAM3
         case Stereo_Algorithm::AlgorithmType::SGBM:
             std::cout << "create sgbm algorithm" << std::endl;
             return std::make_shared<SGBM_Algorithm>(disp_min, disp_max);
+        case Stereo_Algorithm::AlgorithmType::IGEV:
+        case Stereo_Algorithm::AlgorithmType::LiteAnyStereo:
+            std::cerr << "TensorRT model requires model_path. Use create() with model_path parameter." << std::endl;
+            return nullptr;
+        default:
+            return nullptr;
+        }
+    }
+
+    // 带模型路径参数的工厂方法
+    std::shared_ptr<Stereo_Algorithm> Stereo_Algorithm::create(double disp_min, double disp_max, AlgorithmType type,
+                                                                const std::string& model_path)
+    {
+        // 默认输入尺寸
+        cv::Size default_input_size(512, 320);
+        return create(disp_min, disp_max, type, model_path, default_input_size);
+    }
+
+    std::shared_ptr<Stereo_Algorithm> Stereo_Algorithm::create(double disp_min, double disp_max, AlgorithmType type,
+                                                                const std::string& model_path,
+                                                                const cv::Size& input_size)
+    {
+        switch (type)
+        {
+        case Stereo_Algorithm::AlgorithmType::ELAS:
+            std::cout << "create elas algorithm" << std::endl;
+            return std::make_shared<Elas_Algorithm>(disp_min, disp_max);
+        case Stereo_Algorithm::AlgorithmType::SGBM:
+            std::cout << "create sgbm algorithm" << std::endl;
+            return std::make_shared<SGBM_Algorithm>(disp_min, disp_max);
+        case Stereo_Algorithm::AlgorithmType::IGEV:
+            std::cout << "create IGEV TensorRT algorithm: " << model_path << std::endl;
+            return std::make_shared<TensorRT_Stereo_Algorithm>(model_path, input_size, disp_min, disp_max, true);
+        case Stereo_Algorithm::AlgorithmType::LiteAnyStereo:
+            std::cout << "create LiteAnyStereo TensorRT algorithm: " << model_path << std::endl;
+            return std::make_shared<TensorRT_Stereo_Algorithm>(model_path, input_size, disp_min, disp_max, false);
         default:
             return nullptr;
         }
@@ -78,5 +114,94 @@ namespace ORB_SLAM3
         wlsfilter->filter(disp,left_rectified,disp,right_disp);
 #endif
         return disp / 16;
+    }
+
+    // ----------------------------------------------------------------
+    // TensorRT Stereo Algorithm (IGEV / LiteAnyStereo)
+
+    TensorRT_Stereo_Algorithm::TensorRT_Stereo_Algorithm(
+        const std::string& model_path,
+        const cv::Size& input_size,
+        double disp_min, double disp_max,
+        bool normalize_disp)
+        : input_size_(input_size), disp_min_(disp_min), disp_max_(disp_max),
+          normalize_disp_(normalize_disp)
+    {
+        if (!model_path.empty()) {
+            model_ = std::make_unique<TRTInfer>(model_path);
+        }
+    }
+
+    TensorRT_Stereo_Algorithm::~TensorRT_Stereo_Algorithm()
+    {
+    }
+
+    cv::Mat TensorRT_Stereo_Algorithm::inference(const cv::Mat &left_rectified, const cv::Mat &right_rectified)
+    {
+        // 1. 预处理
+        cv::Mat left_rgb = preprocess(left_rectified);
+        cv::Mat right_rgb = preprocess(right_rectified);
+
+        // 2. 转换为 blob (NCHW)
+        std::unordered_map<std::string, cv::Mat> input_blob;
+        input_blob["left"] = cv::dnn::blobFromImage(left_rgb, 1.0/255.0, cv::Size(), cv::Scalar(), true, false);
+        input_blob["right"] = cv::dnn::blobFromImage(right_rgb, 1.0/255.0, cv::Size(), cv::Scalar(), true, false);
+
+        // 3. 推理
+        auto output = (*model_)(input_blob);
+
+        // 获取视差输出 - 支持 "disparity" 或 "output" 作为 tensor 名称
+        cv::Mat disp_nchw;
+        if (output.count("disparity")) {
+            disp_nchw = output["disparity"];
+        } else if (output.count("output")) {
+            disp_nchw = output["output"];
+        } else {
+            // 默认取第一个输出
+            disp_nchw = output.begin()->second;
+        }
+
+        // 4. 后处理
+        cv::Mat disp = postprocess(disp_nchw);
+
+        return disp;
+    }
+
+    cv::Mat TensorRT_Stereo_Algorithm::preprocess(const cv::Mat& img)
+    {
+        cv::Mat rgb;
+        if (img.channels() == 1) {
+            cv::cvtColor(img, rgb, cv::COLOR_GRAY2RGB);
+        } else {
+            cv::cvtColor(img, rgb, cv::COLOR_BGR2RGB);
+        }
+
+        original_size_ = rgb.size();
+
+        // Padding 到 32 的倍数
+        int pad_w = (32 - rgb.cols % 32) % 32;
+        int pad_h = (32 - rgb.rows % 32) % 32;
+        cv::copyMakeBorder(rgb, rgb, 0, pad_h, 0, pad_w, cv::BORDER_CONSTANT);
+
+        // Resize 到模型输入尺寸
+        cv::Mat resized;
+        cv::resize(rgb, resized, input_size_);
+
+        return resized;
+    }
+
+    cv::Mat TensorRT_Stereo_Algorithm::postprocess(const cv::Mat& disp_nchw)
+    {
+        // 从 NCHW 转换为 HWC
+        cv::Mat disp_2d(input_size_.height, input_size_.width, CV_32F, disp_nchw.data);
+        cv::Mat disp_orig;
+        cv::resize(disp_2d, disp_orig, original_size_);
+
+        // 视差范围转换
+        if (normalize_disp_) {
+            disp_orig = disp_orig * (disp_max_ - disp_min_);
+        }
+
+        return disp_orig;
     }
 }

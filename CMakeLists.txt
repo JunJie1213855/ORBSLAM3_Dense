@@ -8,6 +8,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}  -Wall   -O3")
 set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE}")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}")
 
+
 # Check C++11 or C++0x support
 include(CheckCXXCompilerFlag)
 CHECK_CXX_COMPILER_FLAG("-std=c++14" COMPILER_SUPPORTS_CXX14)
@@ -31,6 +32,11 @@ if(NOT OpenCV_FOUND)
       message(FATAL_ERROR "OpenCV > 4.4 not found.")
 endif()
 
+MESSAGE("set CUDA and TensorRT")
+set(CUDA_ROOT_DIR "/usr/local/cuda")
+set(TensorRT_ROOT_DIR "/root/TensorRT")
+
+
 MESSAGE("OPENCV VERSION:")
 MESSAGE(${OpenCV_VERSION})
 
@@ -45,6 +51,9 @@ include_directories(
     ${PROJECT_SOURCE_DIR}/include
     ${PROJECT_SOURCE_DIR}/include/CameraModels
     ${PROJECT_SOURCE_DIR}/Thirdparty/Sophus
+    ${PROJECT_SOURCE_DIR}/Thirdparty/TensorRTTemplate/TRTInfer
+    ${TensorRT_ROOT_DIR}/include
+    ${CUDA_ROOT_DIR}/include
     ${EIGEN3_INCLUDE_DIR}
     ${Pangolin_INCLUDE_DIRS}
     ${PCL_INCLUDE_DIRS}
@@ -129,6 +138,7 @@ target_link_libraries(${PROJECT_NAME}
    ${PROJECT_SOURCE_DIR}/Thirdparty/DBoW2/lib/libDBoW2.so
    ${PROJECT_SOURCE_DIR}/Thirdparty/g2o/lib/libg2o.so
    ${PROJECT_SOURCE_DIR}/Thirdparty/elas/lib/libelas.so
+   ${PROJECT_SOURCE_DIR}/Thirdparty/TensorRTTemplate/lib/libtrtemplate.so
    ${PCL_LIBRARIES}
    -lboost_serialization
    -lcrypto
