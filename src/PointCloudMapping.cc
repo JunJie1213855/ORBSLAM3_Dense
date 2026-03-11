@@ -55,7 +55,17 @@ namespace ORB_SLAM3
         // 线程
         viewerThread = make_unique<thread>(bind(&PointCloudMapping::viewer, this));
     }
-    PointCloudMapping::PointCloudMapping(double resolution_, double meank_, double stdthresh_, double unit_, double mindisp_, double maxdisp_,Stereo_Algorithm::AlgorithmType type)
+    PointCloudMapping::PointCloudMapping(
+        double resolution_, 
+        double meank_, 
+        double stdthresh_, 
+        double unit_, 
+        double mindisp_, 
+        double maxdisp_,
+        Stereo_Algorithm::AlgorithmType type,
+        cv::Size input_size,
+        const std::string& model_path
+    )
     {
         std::cout<<"initializa without disp images ,so create a stereo match algorithm!"<<std::endl;
         // 体素采样
@@ -76,9 +86,10 @@ namespace ORB_SLAM3
         // 全局点云
         globalMap.reset(new pcl::PointCloud<pcl::PointXYZRGB>);
         // 视差算法
-        stereo = Stereo_Algorithm::create(mindisp_,maxdisp_,type);
+        stereo = Stereo_Algorithm::create(mindisp_, maxdisp_, type, input_size, model_path);
         std::cout<<"max disp : "<<maxdisp_<<" min disp :"<<mindisp_<<std::endl;
         numDisp = static_cast<int>(maxdisp_ - mindisp_);
+        
         // 线程
         viewerThread = make_unique<thread>(bind(&PointCloudMapping::viewer, this));
     }

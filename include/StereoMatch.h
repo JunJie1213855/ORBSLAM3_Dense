@@ -18,28 +18,21 @@ namespace ORB_SLAM3
     class Stereo_Algorithm
     {
     public:
-    enum AlgorithmType{
-        ELAS = 0,
-        SGBM = 1,
-        IGEV = 2,
-        LiteAnyStereo = 3
-    };
+        enum AlgorithmType
+        {
+            ELAS = 0,
+            SGBM = 1,
+            IGEV = 2,
+            LiteAnyStereo = 3
+        };
+
     public:
         //
         virtual cv::Mat inference(const cv::Mat &left_rectified, const cv::Mat &right_rectified) = 0;
 
         // 原有工厂方法，保持向后兼容
-        static std::shared_ptr<Stereo_Algorithm> create(double disp_min, double disp_max, AlgorithmType type);
-
-        // 带模型路径参数的工厂方法 - 用于 TensorRT 模型
-        static std::shared_ptr<Stereo_Algorithm> create(double disp_min, double disp_max, AlgorithmType type,
-                                                       const std::string& model_path);
-        static std::shared_ptr<Stereo_Algorithm> create(double disp_min, double disp_max, AlgorithmType type,
-                                                       const std::string& model_path,
-                                                       const cv::Size& input_size);
-    
+        static std::shared_ptr<Stereo_Algorithm> create(double disp_min, double disp_max, AlgorithmType type, cv::Size input_size = cv::Size(),const std::string &model_path = "");
     };
-
 
     // disparity calculation
     class Elas_Algorithm : public Stereo_Algorithm
@@ -58,14 +51,14 @@ namespace ORB_SLAM3
     public:
         SGBM_Algorithm(double disp_min, double disp_max);
         virtual cv::Mat inference(const cv::Mat &left_rectified, const cv::Mat &right_rectified);
+
     public:
         cv::Ptr<cv::StereoSGBM> model;
 #ifdef WITH_FILTER
-    // filter
-    cv::Ptr<cv::ximgproc::DisparityWLSFilter> wlsfilter;
-    cv::Ptr<cv::StereoMatcher> model_right;
+        // filter
+        cv::Ptr<cv::ximgproc::DisparityWLSFilter> wlsfilter;
+        cv::Ptr<cv::StereoMatcher> model_right;
 #endif
-        
     };
 
     // TensorRT 立体匹配算法 - 支持 IGEV 和 LiteAnyStereo
@@ -73,20 +66,18 @@ namespace ORB_SLAM3
     {
     public:
         TensorRT_Stereo_Algorithm(
-            const std::string& model_path,
-            const cv::Size& input_size,
-            double disp_min, double disp_max,
-            bool normalize_disp = true);
+            const std::string &model_path,
+            const cv::Size &input_size);
         virtual ~TensorRT_Stereo_Algorithm();
 
         virtual cv::Mat inference(const cv::Mat &left_rectified,
-                                 const cv::Mat &right_rectified) override;
+                                  const cv::Mat &right_rectified) override;
 
     private:
         // 预处理
-        cv::Mat preprocess(const cv::Mat& img);
+        cv::Mat preprocess(const cv::Mat &img);
         // 后处理
-        cv::Mat postprocess(const cv::Mat& disp);
+        cv::Mat postprocess(const cv::Mat &disp);
 
     private:
         std::unique_ptr<TRTInfer> model_;

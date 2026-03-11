@@ -117,5 +117,16 @@ PointCloudMapping.Resolution: 0.1 # voxel filter
 PointCloudMapping.MeanK: 20.0  # outlier filter
 PointCloudMapping.StdThresh: 0.5 # outlier filter
 PointCloudMapping.Unit: 1.0 # mm(1000) or m(1) 
-PointCloudMapping.mindisp: 1.0 
-PointCloudMapping.maxdisp: 128.0
+
+#--------------------------------------------------------------------------------------------
+# TensorRT Stereo Matching Parameters (Optional)
+#--------------------------------------------------------------------------------------------
+# Algorithm type: 0=ELAS, 1=SGBM, 2=IGEV, 3=LiteAnyStereo
+Stereo.Type: 0
+
+# TensorRT model path (required when Stereo.Type is 2 or 3)
+Stereo.TensorRTModelPath: "./models/igev_752.engine"
+
+# Disparity range
+Stereo.DispMin: 0.0
+Stereo.DispMax: 128.0

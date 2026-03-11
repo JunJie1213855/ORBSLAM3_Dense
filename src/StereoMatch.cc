@@ -3,7 +3,7 @@
 namespace ORB_SLAM3
 {
 
-    std::shared_ptr<Stereo_Algorithm> Stereo_Algorithm::create(double disp_min, double disp_max, AlgorithmType type)
+    std::shared_ptr<Stereo_Algorithm> Stereo_Algorithm::create(double disp_min, double disp_max, AlgorithmType type, cv::Size input_size, const std::string& model_path)
     {
         switch (type)
         {
@@ -14,46 +14,16 @@ namespace ORB_SLAM3
             std::cout << "create sgbm algorithm" << std::endl;
             return std::make_shared<SGBM_Algorithm>(disp_min, disp_max);
         case Stereo_Algorithm::AlgorithmType::IGEV:
+            std::cout << "create igev algorithm" << std::endl;
+            return std::make_shared<TensorRT_Stereo_Algorithm>(model_path, input_size);
         case Stereo_Algorithm::AlgorithmType::LiteAnyStereo:
-            std::cerr << "TensorRT model requires model_path. Use create() with model_path parameter." << std::endl;
-            return nullptr;
+            std::cerr << "create igev algorithm" << std::endl;
+            return std::make_shared<TensorRT_Stereo_Algorithm>(model_path, input_size);
         default:
             return nullptr;
         }
     }
 
-    // 带模型路径参数的工厂方法
-    std::shared_ptr<Stereo_Algorithm> Stereo_Algorithm::create(double disp_min, double disp_max, AlgorithmType type,
-                                                                const std::string& model_path)
-    {
-        // 默认输入尺寸
-        cv::Size default_input_size(512, 320);
-        return create(disp_min, disp_max, type, model_path, default_input_size);
-    }
-
-    std::shared_ptr<Stereo_Algorithm> Stereo_Algorithm::create(double disp_min, double disp_max, AlgorithmType type,
-                                                                const std::string& model_path,
-                                                                const cv::Size& input_size)
-    {
-        switch (type)
-        {
-        case Stereo_Algorithm::AlgorithmType::ELAS:
-            std::cout << "create elas algorithm" << std::endl;
-            return std::make_shared<Elas_Algorithm>(disp_min, disp_max);
-        case Stereo_Algorithm::AlgorithmType::SGBM:
-            std::cout << "create sgbm algorithm" << std::endl;
-            return std::make_shared<SGBM_Algorithm>(disp_min, disp_max);
-        case Stereo_Algorithm::AlgorithmType::IGEV:
-            std::cout << "create IGEV TensorRT algorithm: " << model_path << std::endl;
-            return std::make_shared<TensorRT_Stereo_Algorithm>(model_path, input_size, disp_min, disp_max, true);
-        case Stereo_Algorithm::AlgorithmType::LiteAnyStereo:
-            std::cout << "create LiteAnyStereo TensorRT algorithm: " << model_path << std::endl;
-            return std::make_shared<TensorRT_Stereo_Algorithm>(model_path, input_size, disp_min, disp_max, false);
-        default:
-            return nullptr;
-        }
-    }
-    // ----------------------------------------------------------------
     // elas algorithm setting
     Elas_Algorithm::Elas_Algorithm(double disp_min, double disp_max)
     {
@@ -121,11 +91,8 @@ namespace ORB_SLAM3
 
     TensorRT_Stereo_Algorithm::TensorRT_Stereo_Algorithm(
         const std::string& model_path,
-        const cv::Size& input_size,
-        double disp_min, double disp_max,
-        bool normalize_disp)
-        : input_size_(input_size), disp_min_(disp_min), disp_max_(disp_max),
-          normalize_disp_(normalize_disp)
+        const cv::Size& input_size)
+        : input_size_(input_size)
     {
         if (!model_path.empty()) {
             model_ = std::make_unique<TRTInfer>(model_path);
