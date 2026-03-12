@@ -1,6 +1,6 @@
 
 ### 一、RGBD数据集
-#### 1.标定
+#### 1.数据集设置
 首先获取数据集包含rgb图像、红外图像和深度图像，示例的目录如下
 ```txt
 - $root_dir
@@ -30,7 +30,7 @@
 * RGBD.DepthMapFactor 深度映射的尺度因子，如果为m的话就是1000.0，mm就是1.0
 * PointCloudMapping.Unit 单位尺度，m为1.0，mm为1000.00
 
-这些可能需要厂商提供，或者是用图像配准算法计算，这个作者并不在行；一个具体的实例如下（也可以见[MyExample/rgbd_orb.yaml](MyExample/rgbd_orb.yaml)）。
+这些可能需要厂商提供，或者是用图像配准算法计算（这个作者并不在行）；一个具体的yaml配置文件实例如下（也可以见[MyExample/rgbd_orb.yaml](MyExample/rgbd_orb.yaml)）。
 ```yaml
 %YAML:1.0
 
@@ -167,7 +167,12 @@ python .\calibpython\stereocalib.py -h
 一个简单的示例
 ```bash
 # 示例
-python .\calibpython\stereocalib.py -l ./data/calib/left -r ./data/calib/right -bs 7 6  -s 0.02 -rs 11 11 -sd 
+python .\calibpython\stereocalib.py -l ./data/calib/left \
+									-r ./data/calib/right \
+									-bs 7 6  \
+									-s 0.02 \
+									-rs 11 11 \
+									-sd 
 ```
 参数解释如下
 * -l 左目图像集路径
