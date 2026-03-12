@@ -192,7 +192,7 @@ namespace ORB_SLAM3
             float resolution = fsSettings["PointCloudMapping.Resolution"];
             float meank = fsSettings["PointCloudMapping.MeanK"];
             float stdthresh = fsSettings["PointCloudMapping.StdThresh"];
-            float unit = fsSettings["PointCloudMapping.Unit"];
+            float unit = fsSettings["PointCloudMapping.Unit"]; 
             // 深度学习 TensorRT 模型路径(可选)
             cv::FileNode model_path = fsSettings["Stereo.TensorRTModelPath"];
 

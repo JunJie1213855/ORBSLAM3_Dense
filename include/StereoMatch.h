@@ -14,6 +14,16 @@
 
 namespace ORB_SLAM3
 {
+    // 参数结构化
+    struct Stereo_Parameters
+    {
+        double disp_min;
+        double disp_max;
+        // Stereo_Algorithm::AlgorithmType type;
+        cv::Size input_size = cv::Size();
+        const std::string &model_path = "";
+    };
+
     // base class for sterep matching
     class Stereo_Algorithm
     {
@@ -31,7 +41,9 @@ namespace ORB_SLAM3
         virtual cv::Mat inference(const cv::Mat &left_rectified, const cv::Mat &right_rectified) = 0;
 
         // 原有工厂方法，保持向后兼容
-        static std::shared_ptr<Stereo_Algorithm> create(double disp_min, double disp_max, AlgorithmType type, cv::Size input_size = cv::Size(),const std::string &model_path = "");
+        static std::shared_ptr<Stereo_Algorithm> create(double disp_min, double disp_max, AlgorithmType type, cv::Size input_size = cv::Size(), const std::string &model_path = "");
+        // 参数结构化的方法
+        // static std::shared_ptr<Stereo_Algorithm> create(Stereo_Parameters parameters);
     };
 
     // disparity calculation
@@ -61,14 +73,14 @@ namespace ORB_SLAM3
 #endif
     };
 
-    // TensorRT 立体匹配算法 - 支持 IGEV 和 LiteAnyStereo
-    class TensorRT_Stereo_Algorithm : public Stereo_Algorithm
+    // TensorRT 立体匹配算法 -  IGEV
+    class TensorRT_IGEV : public Stereo_Algorithm
     {
     public:
-        TensorRT_Stereo_Algorithm(
+        TensorRT_IGEV(
             const std::string &model_path,
             const cv::Size &input_size);
-        virtual ~TensorRT_Stereo_Algorithm();
+        virtual ~TensorRT_IGEV();
 
         virtual cv::Mat inference(const cv::Mat &left_rectified,
                                   const cv::Mat &right_rectified) override;
@@ -77,7 +89,7 @@ namespace ORB_SLAM3
         // 预处理
         cv::Mat preprocess(const cv::Mat &img);
         // 后处理
-        cv::Mat postprocess(const cv::Mat &disp);
+        cv::Mat postprocess(const cv::Mat &disp, const cv::Size &origin_size);
 
     private:
         std::unique_ptr<TRTInfer> model_;
@@ -87,6 +99,46 @@ namespace ORB_SLAM3
         bool normalize_disp_;
     };
 
+    // TensorRT 立体匹配算法 - LiteAnyStereo
+    class TensorRT_LiteAnyStereo : public Stereo_Algorithm
+    {
+    public:
+        TensorRT_LiteAnyStereo(
+            const std::string &model_path,
+            const cv::Size &input_size)
+        {
+            std::cout << "todo, please wait" << std::endl;
+        }
+        virtual ~TensorRT_LiteAnyStereo() { std::cout << "todo, please wait" << std::endl; }
+
+        virtual cv::Mat inference(const cv::Mat &left_rectified,
+                                  const cv::Mat &right_rectified) override
+        {
+            std::cout << "todo, please wait" << std::endl;
+            return cv::Mat();
+        }
+
+    private:
+        // 预处理
+        cv::Mat preprocess(const cv::Mat &img)
+        {
+            std::cout << "todo, please wait" << std::endl;
+            return cv::Mat();
+        }
+        // 后处理
+        cv::Mat postprocess(const cv::Mat &disp, const cv::Size &origin_size)
+        {
+            std::cout << "todo, please wait" << std::endl;
+            return cv::Mat();
+        }
+
+    private:
+        std::unique_ptr<TRTInfer> model_;
+        cv::Size input_size_;
+        cv::Size original_size_;
+        double disp_min_, disp_max_;
+        bool normalize_disp_;
+    };
 }
 
 #endif

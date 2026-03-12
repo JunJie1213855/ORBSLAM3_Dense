@@ -56,8 +56,8 @@ int main(int argc, char *argv[])
     ("help", "produce help message")
     ("left_dir,l",boost::program_options::value<std::string>(&left_dir),"the root dir of left dataset")
 	("right_dir,r",boost::program_options::value<std::string>(&right_dir),"the root dir of right dataset")
-    ("param_path,p",boost::program_options::value<std::string>(&parampath)->default_value("./MyExample/stereoslam.yaml"))
-    ("voc_path,v",boost::program_options::value<std::string>(&vocpath)->default_value("./Vocabulary/ORBvoc.txt"))
+    ("param_path,p",boost::program_options::value<std::string>(&parampath)->default_value("/root/lib/ORBSLAM3_Dense/MyExample/stereoslam.yaml"))
+    ("voc_path,v",boost::program_options::value<std::string>(&vocpath)->default_value("/root/lib/ORBSLAM3_Dense/Vocabulary/ORBvoc.txt"))
     ;
 
     boost::program_options::variables_map vm;

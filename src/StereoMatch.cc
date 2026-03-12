@@ -3,7 +3,7 @@
 namespace ORB_SLAM3
 {
 
-    std::shared_ptr<Stereo_Algorithm> Stereo_Algorithm::create(double disp_min, double disp_max, AlgorithmType type, cv::Size input_size, const std::string& model_path)
+    std::shared_ptr<Stereo_Algorithm> Stereo_Algorithm::create(double disp_min, double disp_max, AlgorithmType type, cv::Size input_size, const std::string &model_path)
     {
         switch (type)
         {
@@ -15,10 +15,10 @@ namespace ORB_SLAM3
             return std::make_shared<SGBM_Algorithm>(disp_min, disp_max);
         case Stereo_Algorithm::AlgorithmType::IGEV:
             std::cout << "create igev algorithm" << std::endl;
-            return std::make_shared<TensorRT_Stereo_Algorithm>(model_path, input_size);
+            return std::make_shared<TensorRT_IGEV>(model_path, input_size);
         case Stereo_Algorithm::AlgorithmType::LiteAnyStereo:
             std::cerr << "create igev algorithm" << std::endl;
-            return std::make_shared<TensorRT_Stereo_Algorithm>(model_path, input_size);
+            return std::make_shared<TensorRT_LiteAnyStereo>(model_path, input_size);
         default:
             return nullptr;
         }
@@ -29,7 +29,7 @@ namespace ORB_SLAM3
     {
         param = Elas::parameters(Elas::setting::MIDDLEBURY);
         param.disp_min = disp_min;
-        param.disp_max = disp_max;       
+        param.disp_max = disp_max;
         // model
         model = std::make_unique<Elas>(param);
     }
@@ -80,8 +80,8 @@ namespace ORB_SLAM3
         model->compute(left_rectified, right_rectified, disp);
 #ifdef WITH_FILTER
         cv::Mat right_disp;
-        model_right->compute(right_rectified,left_rectified,right_disp);
-        wlsfilter->filter(disp,left_rectified,disp,right_disp);
+        model_right->compute(right_rectified, left_rectified, right_disp);
+        wlsfilter->filter(disp, left_rectified, disp, right_disp);
 #endif
         return disp / 16;
     }
@@ -89,57 +89,59 @@ namespace ORB_SLAM3
     // ----------------------------------------------------------------
     // TensorRT Stereo Algorithm (IGEV / LiteAnyStereo)
 
-    TensorRT_Stereo_Algorithm::TensorRT_Stereo_Algorithm(
-        const std::string& model_path,
-        const cv::Size& input_size)
+    TensorRT_IGEV::TensorRT_IGEV(
+        const std::string &model_path,
+        const cv::Size &input_size)
         : input_size_(input_size)
     {
-        if (!model_path.empty()) {
+        if (!model_path.empty())
+        {
             model_ = std::make_unique<TRTInfer>(model_path);
         }
     }
 
-    TensorRT_Stereo_Algorithm::~TensorRT_Stereo_Algorithm()
+    TensorRT_IGEV::~TensorRT_IGEV()
     {
     }
 
-    cv::Mat TensorRT_Stereo_Algorithm::inference(const cv::Mat &left_rectified, const cv::Mat &right_rectified)
+    cv::Mat TensorRT_IGEV::inference(const cv::Mat &left_rectified, const cv::Mat &right_rectified)
     {
+        // std::cout << "inference!!!" << std::endl;
+        // std::cout << "preprocess!!!" << std::endl;
         // 1. 预处理
         cv::Mat left_rgb = preprocess(left_rectified);
         cv::Mat right_rgb = preprocess(right_rectified);
+        // std::cout << left_rgb.size() << std::endl;
 
         // 2. 转换为 blob (NCHW)
         std::unordered_map<std::string, cv::Mat> input_blob;
-        input_blob["left"] = cv::dnn::blobFromImage(left_rgb, 1.0/255.0, cv::Size(), cv::Scalar(), true, false);
-        input_blob["right"] = cv::dnn::blobFromImage(right_rgb, 1.0/255.0, cv::Size(), cv::Scalar(), true, false);
+        input_blob["left"] = cv::dnn::blobFromImage(left_rgb, 1.0, cv::Size(), cv::Scalar(), false, false);
+        input_blob["right"] = cv::dnn::blobFromImage(right_rgb, 1.0, cv::Size(), cv::Scalar(), false, false);
 
         // 3. 推理
+        // std::cout << "inference!!!" << std::endl;
         auto output = (*model_)(input_blob);
-
+        // std::cout << "inference finish!!!" << std::endl;
         // 获取视差输出 - 支持 "disparity" 或 "output" 作为 tensor 名称
-        cv::Mat disp_nchw;
-        if (output.count("disparity")) {
-            disp_nchw = output["disparity"];
-        } else if (output.count("output")) {
-            disp_nchw = output["output"];
-        } else {
-            // 默认取第一个输出
-            disp_nchw = output.begin()->second;
-        }
+        cv::Mat disp_nchw = output["disparity"];
 
-        // 4. 后处理
-        cv::Mat disp = postprocess(disp_nchw);
-
+        // 4. 后处理 - TensorRT输出是 1x1x768x480 (NCHW格式)，即368640个元素
+        // std::cout << "postprocess!!!" << std::endl;
+        // 1 x 1 x H x W ->   H x W
+        cv::Mat disp = postprocess(disp_nchw.reshape(1, left_rgb.size().height), input_size_);
+        // std::cout << "output size : " << disp.size() << std::endl;
         return disp;
     }
 
-    cv::Mat TensorRT_Stereo_Algorithm::preprocess(const cv::Mat& img)
+    cv::Mat TensorRT_IGEV::preprocess(const cv::Mat &img)
     {
         cv::Mat rgb;
-        if (img.channels() == 1) {
+        if (img.channels() == 1)
+        {
             cv::cvtColor(img, rgb, cv::COLOR_GRAY2RGB);
-        } else {
+        }
+        else
+        {
             cv::cvtColor(img, rgb, cv::COLOR_BGR2RGB);
         }
 
@@ -150,25 +152,21 @@ namespace ORB_SLAM3
         int pad_h = (32 - rgb.rows % 32) % 32;
         cv::copyMakeBorder(rgb, rgb, 0, pad_h, 0, pad_w, cv::BORDER_CONSTANT);
 
-        // Resize 到模型输入尺寸
-        cv::Mat resized;
-        cv::resize(rgb, resized, input_size_);
-
-        return resized;
+        return rgb;
     }
 
-    cv::Mat TensorRT_Stereo_Algorithm::postprocess(const cv::Mat& disp_nchw)
+    cv::Mat unpadImage(const cv::Mat &img, const cv::Size &orig_size)
     {
-        // 从 NCHW 转换为 HWC
-        cv::Mat disp_2d(input_size_.height, input_size_.width, CV_32F, disp_nchw.data);
-        cv::Mat disp_orig;
-        cv::resize(disp_2d, disp_orig, original_size_);
+        return img(cv::Rect(0, 0, orig_size.width, orig_size.height)).clone();
+    }
+    cv::Mat TensorRT_IGEV::postprocess(const cv::Mat &disp, const cv::Size &origin_size)
+    {
+        // 移除 padding，恢复原始尺寸
+        cv::Mat disp_unpadded = unpadImage(disp, origin_size);
+        // std::cout << "unpad size : "<< disp_unpadded.size() << std::endl;
+        // 去除 batch 和 channel 维度: HxW
+        // disp_unpadded = disp_unpadded.reshape(1, origin_size.height);
 
-        // 视差范围转换
-        if (normalize_disp_) {
-            disp_orig = disp_orig * (disp_max_ - disp_min_);
-        }
-
-        return disp_orig;
+        return disp_unpadded;
     }
 }
