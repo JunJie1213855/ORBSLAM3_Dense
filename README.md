@@ -60,7 +60,7 @@ set(TensorRT_ROOT_DIR "/root/TensorRT")
 ```
 重新设置
 ```
-set(CUDA_ROOT_DIR "${your_cuda_root}/TensorRT")
+set(CUDA_ROOT_DIR "${your_cuda_root}/cuda")
 set(TensorRT_ROOT_DIR "${your_tensorrt_root}/TensorRT")
 ```
 具体路径设置看lib文件夹在哪。
