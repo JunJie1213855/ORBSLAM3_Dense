@@ -76,7 +76,7 @@ namespace ORB_SLAM3
         // 全局点云
         globalMap.reset(new pcl::PointCloud<pcl::PointXYZRGB>);
         // 视差算法
-        stereo = Stereo_Algorithm::create(mindisp_,maxdisp_,type);
+        stereo = Stereo_Algorithm::create(mindisp_, maxdisp_, type);
         std::cout<<"max disp : "<<maxdisp_<<" min disp :"<<mindisp_<<std::endl;
         numDisp = static_cast<int>(maxdisp_ - mindisp_);
         // 线程

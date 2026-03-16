@@ -180,25 +180,48 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
     mpFrameDrawer = new FrameDrawer(mpAtlas);
     mpMapDrawer = new MapDrawer(mpAtlas, strSettingsFile, settings_);
 
-    // 稠密重建
-    // 对STEREO和RGBD相机重建
-    if(mSensor == IMU_STEREO || mSensor == STEREO || mSensor == IMU_RGBD || mSensor == RGBD){
-        // 获取参数
-        float resolution = fsSettings["PointCloudMapping.Resolution"];
-        float meank = fsSettings["PointCloudMapping.MeanK"];
-        float stdthresh = fsSettings["PointCloudMapping.StdThresh"];
-        float unit = fsSettings["PointCloudMapping.Unit"];
-        cv::FileNode node_mindisp = fsSettings["PointCloudMapping.mindisp"];
-        cv::FileNode node_maxdisp = fsSettings["PointCloudMapping.maxdisp"];
-        if(node_maxdisp.empty() || node_maxdisp.empty()){
-            // 提供视差图
-            mpPointCloudMapping = std::make_shared<PointCloudMapping>(resolution,meank,stdthresh,unit);
-        } else{
-            // 不提供视差图,使用视差算法
-            mpPointCloudMapping = std::make_shared<PointCloudMapping>(resolution,meank,stdthresh,unit,float(node_mindisp),float(node_maxdisp));
+        if (mSensor == IMU_STEREO || mSensor == STEREO || mSensor == IMU_RGBD || mSensor == RGBD)
+        {
+            // 获取参数
+            float resolution = fsSettings["PointCloudMapping.Resolution"];
+            float meank = fsSettings["PointCloudMapping.MeanK"];
+            float stdthresh = fsSettings["PointCloudMapping.StdThresh"];
+            float unit = fsSettings["PointCloudMapping.Unit"]; 
+
+            // 传统算法ELAS、SGBM 最大最小视差
+            cv::FileNode node_mindisp = fsSettings["Stereo.DispMin"];
+            cv::FileNode node_maxdisp = fsSettings["Stereo.DispMax"];
+            if (node_maxdisp.empty() || node_maxdisp.empty())
+            {
+                // RGBD提供深度图 或者 双目提供视差图
+                mpPointCloudMapping = std::make_shared<PointCloudMapping>(resolution, meank, stdthresh, unit);
+            }
+            else
+            {
+                // 立体匹配视差类型
+                cv::FileNode type = fsSettings["Stereo.Type"];
+                if (type.empty())
+                {
+                    std::cerr << "Error, without Stereo.Type set" << std::endl;
+                    throw std::runtime_error("Error, without Stereo.Type set");
+                }
+                Stereo_Algorithm::AlgorithmType real_type;
+                switch (type)
+                {
+                case 0:
+                    real_type = Stereo_Algorithm::AlgorithmType::ELAS;
+                    break;
+                case 1:
+                    real_type = Stereo_Algorithm::AlgorithmType::SGBM;
+                    break;
+                default:
+                    real_type = Stereo_Algorithm::AlgorithmType::ELAS;
+                    break;
+                }
+                // 创建
+                mpPointCloudMapping = std::make_shared<PointCloudMapping>(resolution, meank, stdthresh, unit, float(node_mindisp), float(node_maxdisp), real_type);
+            }
         }
-        
-    }
     
     //Initialize the Tracking thread
     //(it will live in the main thread of execution, the one that called this constructor)

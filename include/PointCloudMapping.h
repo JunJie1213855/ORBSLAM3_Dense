@@ -34,8 +34,17 @@ namespace ORB_SLAM3
 
         // initial
         PointCloudMapping(double resolution_,double meank_,double stdthresh_,double unit_);
+
         // initial with the stereo matching algorithm
-        PointCloudMapping(double resolution_,double meank_,double stdthresh_,double unit_,double mindisp_,double maxdisp_,Stereo_Algorithm::AlgorithmType type = Stereo_Algorithm::AlgorithmType::ELAS);
+        PointCloudMapping(
+            double resolution_,
+            double meank_,
+            double stdthresh_,
+            double unit_,
+            double mindisp_,
+            double maxdisp_,
+            Stereo_Algorithm::AlgorithmType type = Stereo_Algorithm::AlgorithmType::ELAS
+        );
 
         // add the Coordinate which stand for the pose into the pcl viewer
         /**@brief
