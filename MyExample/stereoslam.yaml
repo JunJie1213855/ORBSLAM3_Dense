@@ -116,6 +116,11 @@ Viewer.imageViewScale: 1.0
 PointCloudMapping.Resolution: 0.1 # voxel filter
 PointCloudMapping.MeanK: 20.0  # outlier filter
 PointCloudMapping.StdThresh: 0.5 # outlier filter
-PointCloudMapping.Unit: 1.0 # mm(1000) or m(1) 
-PointCloudMapping.mindisp: 1.0 
-PointCloudMapping.maxdisp: 128.0
+PointCloudMapping.Unit: 1.0 # mm(1000) or m(1)
+
+
+
+
+
+Stereo.MinDisp: 1.0 
+Stereo.MaxDisp: 128.0
