@@ -112,7 +112,7 @@ namespace ORB_SLAM3
     {
         mSensor = MappingSensor::RGBD;
         cout << "receive a keyframe, id = " << kf->mnId << endl;
-        unique_lock<mutex> lck(keyframeMutex);
+        unique_lock<mutex> lck(keyFrameUpdateMutex);
         // 数据
         keyframes.push_back(kf);
         colorImgs.push_back(color.clone());
@@ -125,7 +125,7 @@ namespace ORB_SLAM3
     {
         mSensor = MappingSensor::STEREO;
         cout << "receive a keyframe, id = " << kf->mnId << endl;
-        unique_lock<mutex> lck(keyframeMutex);
+        unique_lock<mutex> lck(keyFrameUpdateMutex);
         // 数据
         keyframes.push_back(kf);
         colorImgs.push_back(left.clone());
@@ -139,7 +139,7 @@ namespace ORB_SLAM3
     {
         mSensor = MappingSensor::STEREO;
         cout << "receive a keyframe, id = " << kf->mnId << endl;
-        unique_lock<mutex> lck(keyframeMutex);
+        unique_lock<mutex> lck(keyFrameUpdateMutex);
         // 数据
         keyframes.push_back(kf);
         colorImgs.push_back(left.clone());
@@ -340,6 +340,7 @@ namespace ORB_SLAM3
         // std::shared_ptr<pcl::visualization::CloudViewer> cloud_viewer(new pcl::visualization::CloudViewer("Point Cloud"));
         while (1)
         {
+            size_t N = 0;
             {
                 unique_lock<mutex> lck_keyframeUpdated(keyFrameUpdateMutex);
                 // 这里等待 inseart key frame 函数的条件变量
@@ -349,13 +350,7 @@ namespace ORB_SLAM3
                 {
                     break;
                 }
-            }
-
-            // keyframe is updated
-            size_t N = 0;
-            {
-                // key frames lock
-                unique_lock<mutex> lck(keyframeMutex);
+                // keyframe is updated
                 N = keyframes.size();
             }
             // PointCloud::Ptr all_p(new PointCloud());
