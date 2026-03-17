@@ -115,7 +115,6 @@ namespace ORB_SLAM3
 
         // 关机标志
         std::atomic<bool> shutDownFlag{false};
-        std::mutex shutDownMutex;
 
         // 线程阻塞变量
         std::condition_variable keyFrameUpdated;
@@ -130,8 +129,7 @@ namespace ORB_SLAM3
         std::vector<cv::Mat> dispImgs;
         cv::Mat Q;
 
-        // 线程锁
-        std::mutex keyframeMutex;
+        // 处理完的上一帧编号
         uint16_t lastKeyframeSize = 0;
 
         // 降采样
