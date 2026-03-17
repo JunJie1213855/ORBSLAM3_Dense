@@ -84,7 +84,7 @@ namespace ORB_SLAM3
         this->unit = unit_;
         // 全局点云
         globalMap.reset(new pcl::PointCloud<pcl::PointXYZRGB>);
-        
+
         // 视差算法
         stereo = Stereo_Algorithm::create(mindisp_, maxdisp_, type, input_size, model_path);
 
@@ -98,10 +98,10 @@ namespace ORB_SLAM3
     void PointCloudMapping::shutdown()
     {
         {
-            unique_lock<mutex> lck(shutDownMutex);
-            shutDownFlag = true;
-            keyFrameUpdated.notify_one();
+            shutDownFlag.store(true);
+            keyFrameUpdated.notify_all();
         }
+
         viewerThread->join();
         save();
     }
@@ -182,8 +182,24 @@ namespace ORB_SLAM3
 
         // get the transform point cloud
         PointCloud::Ptr cloud(new PointCloud());
-        pcl::transformPointCloud(*tmp, *cloud, kf->GetPoseInverse().matrix());
-        cloud->is_dense = false;
+        Eigen::Matrix4f transform = kf->GetPoseInverse().matrix();
+        cloud->width = tmp->width;
+        cloud->height = tmp->height;
+        cloud->is_dense = tmp->is_dense;
+        cloud->points.resize(tmp->points.size());
+
+        for (size_t i = 0; i < tmp->points.size(); ++i)
+        {
+            const PointT &pt = tmp->points[i];
+            Eigen::Vector4f v(pt.x, pt.y, pt.z, 1.0);
+            Eigen::Vector4f vt = transform * v;
+            cloud->points[i].x = vt[0];
+            cloud->points[i].y = vt[1];
+            cloud->points[i].z = vt[2];
+            cloud->points[i].r = pt.r;
+            cloud->points[i].g = pt.g;
+            cloud->points[i].b = pt.b;
+        }
         // print
         // cout << "generate point cloud for kf " << kf->mnId << ", size=" << cloud->points.size() << endl;
         return cloud;
@@ -194,8 +210,8 @@ namespace ORB_SLAM3
     {
         cv::Mat left_r = left.clone();
         cv::Mat right_r = right.clone();
-        // cv::imwrite("left.png", left);
-        // cv::imwrite("right.png", right);
+        cv::imwrite("left.png", left);
+        cv::imwrite("right.png", right);
         // 视差计算
         cv::Mat disp = stereo->inference(left_r, right_r);
         double min = 0;
@@ -235,10 +251,26 @@ namespace ORB_SLAM3
                 tmp->points.push_back(p);
             }
         }
-        
+
         PointCloud::Ptr cloud(new PointCloud());
-        pcl::transformPointCloud(*tmp, *cloud, kf->GetPoseInverse().matrix());
-        cloud->is_dense = false;
+        Eigen::Matrix4f transform = kf->GetPoseInverse().matrix();
+        cloud->width = tmp->width;
+        cloud->height = tmp->height;
+        cloud->is_dense = tmp->is_dense;
+        cloud->points.resize(tmp->points.size());
+
+        for (size_t i = 0; i < tmp->points.size(); ++i)
+        {
+            const PointT &pt = tmp->points[i];
+            Eigen::Vector4f v(pt.x, pt.y, pt.z, 1.0);
+            Eigen::Vector4f vt = transform * v;
+            cloud->points[i].x = vt[0];
+            cloud->points[i].y = vt[1];
+            cloud->points[i].z = vt[2];
+            cloud->points[i].r = pt.r;
+            cloud->points[i].g = pt.g;
+            cloud->points[i].b = pt.b;
+        }
         // std::cout << "z max " << zmax << std::endl;
         //
         cout << "generate point cloud for kf " << kf->mnId << ", size=" << cloud->points.size() << endl;
@@ -278,9 +310,24 @@ namespace ORB_SLAM3
             }
         }
         PointCloud::Ptr cloud(new PointCloud());
-        pcl::transformPointCloud(*tmp, *cloud, kf->GetPoseInverse().matrix());
-        cloud->is_dense = false;
+        Eigen::Matrix4f transform = kf->GetPoseInverse().matrix();
+        cloud->width = tmp->width;
+        cloud->height = tmp->height;
+        cloud->is_dense = tmp->is_dense;
+        cloud->points.resize(tmp->points.size());
 
+        for (size_t i = 0; i < tmp->points.size(); ++i)
+        {
+            const PointT &pt = tmp->points[i];
+            Eigen::Vector4f v(pt.x, pt.y, pt.z, 1.0);
+            Eigen::Vector4f vt = transform * v;
+            cloud->points[i].x = vt[0];
+            cloud->points[i].y = vt[1];
+            cloud->points[i].z = vt[2];
+            cloud->points[i].r = pt.r;
+            cloud->points[i].g = pt.g;
+            cloud->points[i].b = pt.b;
+        }
         //
         // cout << "generate point cloud for kf " << kf->mnId << ", size=" << cloud->points.size() << endl;
         return cloud;
@@ -294,17 +341,14 @@ namespace ORB_SLAM3
         while (1)
         {
             {
-                // shut down lock
-                unique_lock<mutex> lck_shutdown(shutDownMutex);
-                if (shutDownFlag)
+                unique_lock<mutex> lck_keyframeUpdated(keyFrameUpdateMutex);
+                // 这里等待 inseart key frame 函数的条件变量
+                keyFrameUpdated.wait(lck_keyframeUpdated, [this]()
+                                     { return shutDownFlag.load() || lastKeyframeSize < keyframes.size(); });
+                if (shutDownFlag.load())
                 {
                     break;
                 }
-            }
-            {
-                unique_lock<mutex> lck_keyframeUpdated(keyFrameUpdateMutex);
-                // 这里等待 inseart key frame 函数的条件变量
-                keyFrameUpdated.wait(lck_keyframeUpdated);
             }
 
             // keyframe is updated

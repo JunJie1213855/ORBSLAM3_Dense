@@ -17,6 +17,7 @@
 #include <mutex>
 #include <vector>
 #include <condition_variable>
+#include <atomic>
 
 namespace ORB_SLAM3
 {
@@ -113,7 +114,7 @@ namespace ORB_SLAM3
         std::unique_ptr<thread> viewerThread;
 
         // 关机标志
-        bool shutDownFlag = false;
+        std::atomic<bool> shutDownFlag{false};
         std::mutex shutDownMutex;
 
         // 线程阻塞变量

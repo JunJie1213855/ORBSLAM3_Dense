@@ -108,7 +108,7 @@ namespace ORB_SLAM3
     {
         // std::cout << "inference!!!" << std::endl;
         // std::cout << "preprocess!!!" << std::endl;
-        // 1. 预处理
+        // 1. 预处理 = 尺寸转换为 32 整除 + BGR -> RGB
         cv::Mat left_rgb = preprocess(left_rectified);
         cv::Mat right_rgb = preprocess(right_rectified);
         // std::cout << left_rgb.size() << std::endl;
@@ -125,7 +125,7 @@ namespace ORB_SLAM3
         // 获取视差输出 - 支持 "disparity" 或 "output" 作为 tensor 名称
         cv::Mat disp_nchw = output["disparity"];
 
-        // 4. 后处理 - TensorRT输出是 1x1x768x480 (NCHW格式)，即368640个元素
+        // 4. 后处理 - TensorRT输出是 1 x 1 x 768 x 480 (NCHW格式)，即368640个元素
         // std::cout << "postprocess!!!" << std::endl;
         // 1 x 1 x H x W ->   H x W
         cv::Mat disp = postprocess(disp_nchw.reshape(1, left_rgb.size().height), input_size_);
