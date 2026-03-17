@@ -68,6 +68,29 @@ set(TensorRT_ROOT_DIR "${your_tensorrt_root}/TensorRT")
 
 
 ## <div align="center">📦 源码编译</div>
+
+### 1.基础编译环境
+```bash
+sudo apt install cmake git build-essential libeigen3-dev libboost-all-dev libopencv-dev libpcl-dev -y
+```
+
+### 2.Pangolin
+编译：
+```bash
+git clone https://github.com/stevenlovegrove/Pangolin.git
+cd Pangolin
+git checkout v0.6
+cmake -S . -B build
+cmake --build ./build -j 4
+```
+安装
+```bash
+cd build 
+sudo make install
+```
+
+### 3.项目编译
+
 当你满足项目环境时
 ```shell
 bash build.sh
