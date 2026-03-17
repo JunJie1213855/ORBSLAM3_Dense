@@ -17,6 +17,7 @@
 #include <mutex>
 #include <vector>
 #include <condition_variable>
+#include <atomic>
 
 namespace ORB_SLAM3
 {
@@ -113,8 +114,7 @@ namespace ORB_SLAM3
         std::unique_ptr<thread> viewerThread;
 
         // 关机标志
-        bool shutDownFlag = false;
-        std::mutex shutDownMutex;
+        std::atomic<bool> shutDownFlag{false};
 
         // 线程阻塞变量
         std::condition_variable keyFrameUpdated;
@@ -129,8 +129,7 @@ namespace ORB_SLAM3
         std::vector<cv::Mat> dispImgs;
         cv::Mat Q;
 
-        // 线程锁
-        std::mutex keyframeMutex;
+        // 前一帧索引
         uint16_t lastKeyframeSize = 0;
 
         // 降采样
