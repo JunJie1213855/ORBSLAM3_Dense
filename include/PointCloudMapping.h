@@ -17,6 +17,7 @@
 #include <mutex>
 #include <vector>
 #include <condition_variable>
+#include <atomic>
 
 namespace ORB_SLAM3
 {
@@ -97,6 +98,9 @@ namespace ORB_SLAM3
         // the difference bewteen the front one is that the input include the disparity image
         PointCloud::Ptr GetPointCloud(KeyFrame *kf, cv::Mat &left, cv::Mat &right, cv::Mat &disp, cv::Mat &Q);
 
+    private:
+        // Helper function to transform point cloud manually (avoiding PCL bug)
+        PointCloud::Ptr transformPointCloudManual(PointCloud::Ptr& input, const Eigen::Matrix4f& transform);
 
     public:
         // to judge the sensor is rgbd or stereo
@@ -113,7 +117,7 @@ namespace ORB_SLAM3
         std::unique_ptr<thread> viewerThread;
 
         // 关机标志
-        bool shutDownFlag = false;
+        std::atomic<bool> shutDownFlag{false};
         std::mutex shutDownMutex;
 
         // 线程阻塞变量

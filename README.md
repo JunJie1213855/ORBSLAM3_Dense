@@ -228,3 +228,29 @@ cloudcompare PointCloudmapping.ply
 3. **IGEV 推理失败**
    - 确认模型路径正确
    - 检查图像尺寸是否与模型输入尺寸匹配 (默认 480x752)
+
+4. **pcl点云位姿表换失败**
+   - 在PointCloudMapping.cc中用如下代码替换 `pcl::transformPointCloud(*tmp, *cloud, transform);`
+```C++
+cloud->width = tmp->width;
+cloud->height = tmp->height;
+cloud->is_dense = tmp->is_dense;
+cloud->points.resize(tmp->points.size());
+
+for (size_t i = 0; i < tmp->points.size(); ++i) {
+    const PointT& pt = tmp->points[i];
+    Eigen::Vector4f v(pt.x, pt.y, pt.z, 1.0);
+    Eigen::Vector4f vt = transform * v;
+    cloud->points[i].x = vt[0];
+    cloud->points[i].y = vt[1];
+    cloud->points[i].z = vt[2];
+    cloud->points[i].r = pt.r;
+    cloud->points[i].g = pt.g;
+    cloud->points[i].b = pt.b;
+}
+```
+
+5. **Ubuntu 22.04/24.04运行突然卡住**
+    - Qt的定时器只能支持单线程。
+    - 解决办法：将主线程的cv::imshow、cv::waitKey函数注释掉
+    - 在PointCloudMapping.cc中pcl的viewer也要关掉

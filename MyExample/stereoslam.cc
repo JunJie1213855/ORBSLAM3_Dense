@@ -85,13 +85,13 @@ int main(int argc, char *argv[])
 			std::cout << "image empty , exit !" << std::endl;
 			break;
 		}
-		// cv::imshow("left",left_img);
-		// cv::imshow("right",right_img);
+		// cv::imshow("left", left_img);
+		// cv::imshow("right", right_img);
 		auto now = std::chrono::steady_clock::now();
 		auto time = now - start;
 		SLAM.TrackStereo(left_img, right_img, static_cast<double>(time.count()) / 1000.0);
-		if (cv::waitKey(10) == 27)
-			break;
+		// if (cv::waitKey(10) == 27)
+		// 	break;
 	}
 	sleep(3);
 	SLAM.Shutdown();
