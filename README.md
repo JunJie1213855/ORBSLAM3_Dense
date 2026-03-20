@@ -179,7 +179,7 @@ Stereo.TensorRTModelPath : ./igev_480_752.engine # TensorRT权重路径
 
 之后运行
 ```
-./MyExample/stereoslam_disp -l root_dir/left \
+./MyExample/stereoslam -l root_dir/left \
                             -r root_dir/right \
                             -p MyExample/stereoslam.yaml \
                             -v Vocabulary/ORBvoc.txt
