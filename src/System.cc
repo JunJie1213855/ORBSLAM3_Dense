@@ -225,6 +225,7 @@ namespace ORB_SLAM3
                 case 1:
                     real_type = Stereo_Algorithm::AlgorithmType::SGBM;
                     break;
+#ifdef WITH_TENSORRT
                 case 2:
                     real_type = Stereo_Algorithm::AlgorithmType::IGEV;
                     {
@@ -246,6 +247,7 @@ namespace ORB_SLAM3
                 case 3:
                     real_type = Stereo_Algorithm::AlgorithmType::LiteAnyStereo;
                     break;
+#endif
                 default:
                     real_type = Stereo_Algorithm::AlgorithmType::ELAS;
                     break;
