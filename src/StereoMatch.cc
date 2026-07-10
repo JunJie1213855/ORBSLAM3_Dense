@@ -3,11 +3,7 @@
 namespace ORB_SLAM3
 {
 
-<<<<<<< HEAD
     std::shared_ptr<Stereo_Algorithm> Stereo_Algorithm::create(double disp_min, double disp_max, AlgorithmType type, cv::Size input_size, const std::string &model_path)
-=======
-    std::shared_ptr<Stereo_Algorithm> Stereo_Algorithm::create(double disp_min, double disp_max, AlgorithmType type)
->>>>>>> origin/main
     {
         switch (type)
         {
@@ -17,7 +13,6 @@ namespace ORB_SLAM3
         case Stereo_Algorithm::AlgorithmType::SGBM:
             std::cout << "create sgbm algorithm" << std::endl;
             return std::make_shared<SGBM_Algorithm>(disp_min, disp_max);
-<<<<<<< HEAD
 #ifdef WITH_TENSORRT
         case Stereo_Algorithm::AlgorithmType::IGEV:
             std::cout << "create igev algorithm" << std::endl;
@@ -26,27 +21,17 @@ namespace ORB_SLAM3
             std::cerr << "create igev algorithm" << std::endl;
             return std::make_shared<TensorRT_LiteAnyStereo>(model_path, input_size);
 #endif
-=======
->>>>>>> origin/main
         default:
             return nullptr;
         }
     }
-<<<<<<< HEAD
 
-=======
-    // ----------------------------------------------------------------
->>>>>>> origin/main
     // elas algorithm setting
     Elas_Algorithm::Elas_Algorithm(double disp_min, double disp_max)
     {
         param = Elas::parameters(Elas::setting::MIDDLEBURY);
         param.disp_min = disp_min;
-<<<<<<< HEAD
         param.disp_max = disp_max;
-=======
-        param.disp_max = disp_max;       
->>>>>>> origin/main
         // model
         model = std::make_unique<Elas>(param);
     }
@@ -97,7 +82,6 @@ namespace ORB_SLAM3
         model->compute(left_rectified, right_rectified, disp);
 #ifdef WITH_FILTER
         cv::Mat right_disp;
-<<<<<<< HEAD
         model_right->compute(right_rectified, left_rectified, right_disp);
         wlsfilter->filter(disp, left_rectified, disp, right_disp);
 #endif
@@ -190,11 +174,4 @@ namespace ORB_SLAM3
         return disp_unpadded;
     }
 #endif
-=======
-        model_right->compute(right_rectified,left_rectified,right_disp);
-        wlsfilter->filter(disp,left_rectified,disp,right_disp);
-#endif
-        return disp / 16;
-    }
->>>>>>> origin/main
 }

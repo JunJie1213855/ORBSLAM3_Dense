@@ -376,3 +376,51 @@ if(realsense2_FOUND)
             Examples_old/Stereo-Inertial/stereo_inertial_realsense_D435i.cc)
     target_link_libraries(stereo_inertial_realsense_D435i_old ${PROJECT_NAME})
 endif()
+
+# ============================================================================
+# MyExample — Dense mapping demo executables (from ORBSLAM3_Dense)
+# ============================================================================
+
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/MyExample)
+
+# RGB-D dense SLAM
+add_executable(rgbd_slam MyExample/rgbd_slam.cc)
+target_link_libraries(rgbd_slam ${PROJECT_NAME} ${Boost_LIBRARIES})
+
+# Stereo dense SLAM (no disparity — ELAS/SGBM/IGEV internal)
+option(WITH_FILTER "Stereo with WLS filter" OFF)
+if(WITH_FILTER)
+    message("-- Stereo with WLS filter enabled")
+    add_definitions(-DWITH_FILTER)
+endif()
+add_executable(stereoslam MyExample/stereoslam.cc)
+target_link_libraries(stereoslam ${PROJECT_NAME} ${Boost_LIBRARIES})
+
+# Stereo dense SLAM (with precomputed disparity)
+add_executable(stereoslam_disp MyExample/stereoslam_disp.cc)
+target_link_libraries(stereoslam_disp ${PROJECT_NAME} ${Boost_LIBRARIES})
+
+# ZED stereo SLAM (requires ZED SDK)
+option(WITH_ZED "Build ZED camera example" OFF)
+if(WITH_ZED)
+    add_executable(zedslam MyExample/zedslam.cc)
+    target_link_libraries(zedslam ${PROJECT_NAME})
+endif()
+
+# Orbbec RGB-D SLAM (requires Orbbec SDK)
+option(WITH_ORBBEC "Build Orbbec camera example" OFF)
+if(WITH_ORBBEC)
+    add_executable(orbbec_slam MyExample/orbbec_slam.cc
+        ${PROJECT_SOURCE_DIR}/OrbbecThirdparty/utility/register.hpp)
+    target_include_directories(orbbec_slam PUBLIC
+        ${PROJECT_SOURCE_DIR}/OrbbecThirdparty/Common
+        ${PROJECT_SOURCE_DIR}/OrbbecThirdparty/d2c/include
+        ${PROJECT_SOURCE_DIR}/OrbbecThirdparty/OpenNI2/include
+        ${PROJECT_SOURCE_DIR}/OrbbecThirdparty/utility)
+    target_link_libraries(orbbec_slam ${PROJECT_NAME}
+        ${PROJECT_SOURCE_DIR}/OrbbecThirdparty/OpenNI2/lib/libOpenNI2.so
+        ${PROJECT_SOURCE_DIR}/OrbbecThirdparty/OpenNI2/lib/libDepthUtils.a
+        ${PROJECT_SOURCE_DIR}/OrbbecThirdparty/OpenNI2/lib/OpenNI2/Drivers/libOniFile.so
+        ${PROJECT_SOURCE_DIR}/OrbbecThirdparty/OpenNI2/lib/OpenNI2/Drivers/liborbbec.so
+        ${PROJECT_SOURCE_DIR}/OrbbecThirdparty/d2c/lib/libd2c.so)
+endif()

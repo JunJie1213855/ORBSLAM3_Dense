@@ -3,17 +3,13 @@
 
 #include <iostream>
 #include <opencv2/opencv.hpp>
-<<<<<<< HEAD
 #include <opencv2/dnn.hpp>
-=======
->>>>>>> origin/main
 
 #ifdef WITH_FILTER
 #include <opencv2/ximgproc/disparity_filter.hpp>
 #endif
 
 #include "Thirdparty/elas/elas/elas.h"
-<<<<<<< HEAD
 #ifdef WITH_TENSORRT
 #include "Thirdparty/TensorRTTemplate/TRTInfer/TRTinfer.h"
 #endif
@@ -30,16 +26,10 @@ namespace ORB_SLAM3
         const std::string &model_path = "";
     };
 
-=======
-
-namespace ORB_SLAM3
-{
->>>>>>> origin/main
     // base class for sterep matching
     class Stereo_Algorithm
     {
     public:
-<<<<<<< HEAD
         enum AlgorithmType
         {
             ELAS = 0,
@@ -51,30 +41,16 @@ namespace ORB_SLAM3
 #endif
         };
 
-=======
-    enum AlgorithmType{
-        ELAS = 0,
-        SGBM = 1
-    };
->>>>>>> origin/main
     public:
         //
         virtual cv::Mat inference(const cv::Mat &left_rectified, const cv::Mat &right_rectified) = 0;
 
-<<<<<<< HEAD
         // 原有工厂方法，保持向后兼容
         static std::shared_ptr<Stereo_Algorithm> create(double disp_min, double disp_max, AlgorithmType type, cv::Size input_size = cv::Size(), const std::string &model_path = "");
         // 参数结构化的方法
         // static std::shared_ptr<Stereo_Algorithm> create(Stereo_Parameters parameters);
     };
 
-=======
-        static std::shared_ptr<Stereo_Algorithm> create(double disp_min, double disp_max,AlgorithmType type);
-    
-    };
-
-
->>>>>>> origin/main
     // disparity calculation
     class Elas_Algorithm : public Stereo_Algorithm
     {
@@ -92,7 +68,6 @@ namespace ORB_SLAM3
     public:
         SGBM_Algorithm(double disp_min, double disp_max);
         virtual cv::Mat inference(const cv::Mat &left_rectified, const cv::Mat &right_rectified);
-<<<<<<< HEAD
 
     public:
         cv::Ptr<cv::StereoSGBM> model;
@@ -171,18 +146,6 @@ namespace ORB_SLAM3
         bool normalize_disp_;
     };
 #endif
-=======
-    public:
-        cv::Ptr<cv::StereoSGBM> model;
-#ifdef WITH_FILTER
-    // filter
-    cv::Ptr<cv::ximgproc::DisparityWLSFilter> wlsfilter;
-    cv::Ptr<cv::StereoMatcher> model_right;
-#endif
-        
-    };
-
->>>>>>> origin/main
 }
 
 #endif
