@@ -12,6 +12,10 @@ weights/
 CMakeLists.txt.user
 CMakeLists_modified.txt
 
+MyExample/rgbd_slam
+MyExample/stereoslam
+MyExample/stereoslam_disp
+
 Examples/RGB-D/rgbd_tum
 Examples/RGB-D/rgbd_realsense_D435i
 
