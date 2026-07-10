@@ -45,6 +45,10 @@
 namespace ORB_SLAM3
 {
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> origin/main
 class PointCloudMapping;
 class Viewer;
 class FrameDrawer;
@@ -59,6 +63,10 @@ class Tracking
 
 public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+<<<<<<< HEAD
+=======
+
+>>>>>>> origin/main
     // 稠密重建
     Tracking(System* pSys, ORBVocabulary* pVoc, FrameDrawer* pFrameDrawer, MapDrawer* pMapDrawer, Atlas* pAtlas,std::shared_ptr<PointCloudMapping> pPointCloudMapping,
              KeyFrameDatabase* pKFDB, const string &strSettingPath, const int sensor, Settings* settings, const string &_nameSeq=std::string());
@@ -73,6 +81,10 @@ public:
     // Preprocess the input and call Track(). Extract features and performs stereo matching.
     Sophus::SE3f GrabImageStereo(const cv::Mat &imRectLeft,const cv::Mat &imRectRight, const double &timestamp, string filename);
     Sophus::SE3f GrabImageStereo(const cv::Mat &imRectLeft,const cv::Mat &imRectRight, const cv::Mat &imDisp,const double &timestamp, string filename);
+<<<<<<< HEAD
+=======
+    // 
+>>>>>>> origin/main
     Sophus::SE3f GrabImageRGBD(const cv::Mat &imRGB,const cv::Mat &imD, const double &timestamp, string filename);
     Sophus::SE3f GrabImageMonocular(const cv::Mat &im, const double &timestamp, string filename);
 
@@ -141,6 +153,10 @@ public:
     Frame mCurrentFrame;
     Frame mLastFrame;
 
+<<<<<<< HEAD
+=======
+    // 
+>>>>>>> origin/main
     cv::Mat mImGray;
     cv::Mat mImColor;
     cv::Mat mImdepth;
@@ -149,6 +165,10 @@ public:
     cv::Mat mImRight_Stereo;
     cv::Mat disp;
     cv::Mat Q;
+<<<<<<< HEAD
+=======
+    
+>>>>>>> origin/main
 
     // Initialization Variables (Monocular)
     std::vector<int> mvIniLastMatches;
@@ -381,8 +401,11 @@ public:
 
     // for point cloud viewing
     shared_ptr<PointCloudMapping> mpPointCloudMapping;
+<<<<<<< HEAD
 
     bool mbIsDualCamera = false;  // true for KannalaBrandt stereo
+=======
+>>>>>>> origin/main
 };
 
 } //namespace ORB_SLAM

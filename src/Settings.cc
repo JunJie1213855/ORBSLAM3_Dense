@@ -147,7 +147,10 @@ namespace ORB_SLAM3 {
         //Read second camera if stereo (not rectified)
         if(sensor_ == System::STEREO || sensor_ == System::IMU_STEREO){
             readCamera2(fSettings);
+<<<<<<< HEAD
             cout << "\t-Loaded camera 2" << endl;
+=======
+>>>>>>> origin/main
         }
 
         //Read image info
@@ -339,6 +342,10 @@ namespace ORB_SLAM3 {
             bf_ = b_ * calibration1_->getParameter(0);
         }
         else{
+<<<<<<< HEAD
+=======
+            // 转换矩阵
+>>>>>>> origin/main
             cv::Mat cvTlr = readParameter<cv::Mat>(fSettings,"Stereo.T_c1_c2",found);
             Tlr_ = Converter::toSophus(cvTlr);
 
@@ -346,11 +353,20 @@ namespace ORB_SLAM3 {
 
             b_ = Tlr_.translation().norm();
             bf_ = b_ * calibration1_->getParameter(0);
+<<<<<<< HEAD
         }
 
         thDepth_ = readParameter<float>(fSettings,"Stereo.ThDepth",found);
 
 
+=======
+
+            // 稠密重建 
+            Q = readParameter<cv::Mat>(fSettings,"Stereo.Q",found);
+            cout << "\t-Loaded camera 2" << endl;
+        }
+        thDepth_ = readParameter<float>(fSettings,"Stereo.ThDepth",found);
+>>>>>>> origin/main
     }
 
     void Settings::readImageInfo(cv::FileStorage &fSettings) {
@@ -502,8 +518,12 @@ namespace ORB_SLAM3 {
         cv::stereoRectify(K1,camera1DistortionCoef(),K2,camera2DistortionCoef(),newImSize_,
                           R12, t12,
                           R_r1_u1,R_r2_u2,P1,P2,Q,
+<<<<<<< HEAD
                           cv::CALIB_ZERO_DISPARITY,-1,newImSize_);
         Q_ = Q.clone();  // save Q matrix for dense mapping
+=======
+                          cv::CALIB_ZERO_DISPARITY,0,newImSize_);
+>>>>>>> origin/main
         cv::initUndistortRectifyMap(K1, camera1DistortionCoef(), R_r1_u1, P1.rowRange(0, 3).colRange(0, 3),
                                     newImSize_, CV_32F, M1l_, M2l_);
         cv::initUndistortRectifyMap(K2, camera2DistortionCoef(), R_r2_u2, P2.rowRange(0, 3).colRange(0, 3),
@@ -559,6 +579,7 @@ namespace ORB_SLAM3 {
             else{
                 output << "Kannala-Brandt";
             }
+<<<<<<< HEAD
             
             if(settings.cameraType_ != Settings::Rectified){
                 output << "" << ": [";
@@ -567,6 +588,13 @@ namespace ORB_SLAM3 {
                 }
                 output << " ]" << endl;
             }
+=======
+            output << "" << ": [";
+            for(size_t i = 0; i < settings.originalCalib2_->size(); i++){
+                output << " " << settings.originalCalib2_->getParameter(i);
+            }
+            output << " ]" << endl;
+>>>>>>> origin/main
 
             if(!settings.vPinHoleDistorsion2_.empty()){
                 output << "\t-Camera 1 distortion parameters: [ ";

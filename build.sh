@@ -15,15 +15,25 @@ cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j
 
+<<<<<<< HEAD
 cd ../../Sophus
 
 echo "Configuring and building Thirdparty/Sophus ..."
+=======
+cd ../../elas
+
+echo "Configuring and building Thirdparty/elas ..."
+>>>>>>> origin/main
 
 mkdir build
 cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> origin/main
 cd ../../../
 
 echo "Uncompress vocabulary ..."
@@ -37,4 +47,8 @@ echo "Configuring and building ORB_SLAM3 ..."
 mkdir build
 cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
+<<<<<<< HEAD
 make -j4
+=======
+make -j 12
+>>>>>>> origin/main

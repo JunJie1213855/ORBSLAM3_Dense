@@ -75,7 +75,10 @@ namespace ORB_SLAM3 {
         float bf() {return bf_;}
         float b() {return b_;}
         float thDepth() {return thDepth_;}
+<<<<<<< HEAD
         cv::Mat Q() {return Q_;}
+=======
+>>>>>>> origin/main
 
         bool needToUndistort() {return bNeedToUndistort_;}
 
@@ -157,6 +160,11 @@ namespace ORB_SLAM3 {
 
         void precomputeRectificationMaps();
 
+<<<<<<< HEAD
+=======
+
+        public:
+>>>>>>> origin/main
         int sensor_;
         CameraType cameraType_;     //Camera type
 
@@ -178,14 +186,22 @@ namespace ORB_SLAM3 {
         Sophus::SE3f Tlr_;
         float thDepth_;
         float bf_, b_;
+<<<<<<< HEAD
         cv::Mat Q_;
+=======
+>>>>>>> origin/main
 
         /*
          * Rectification stuff
          */
         cv::Mat M1l_, M2l_;
         cv::Mat M1r_, M2r_;
+<<<<<<< HEAD
 
+=======
+        // 稠密重建
+        cv::Mat Q;
+>>>>>>> origin/main
         /*
          * Inertial stuff
          */

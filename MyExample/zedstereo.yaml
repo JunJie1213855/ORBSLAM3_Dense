@@ -1,0 +1,119 @@
+%YAML:1.0
+
+#--------------------------------------------------------------------------------------------
+# System config
+#--------------------------------------------------------------------------------------------
+
+# When the variables are commented, the system doesn't load a previous session or not store the current one
+
+# If the LoadFile doesn't exist, the system give a message and create a new Atlas from scratch
+#System.LoadAtlasFromFile: "Session_MH01_MH02_MH03_Stereo60_Pseudo"
+
+# The store file is created from the current session, if a file with the same name exists it is deleted
+#System.SaveAtlasToFile: "Session_MH01_MH02_MH03_Stereo60_Pseudo"
+
+#--------------------------------------------------------------------------------------------
+# Camera Parameters. Adjust them!
+#--------------------------------------------------------------------------------------------
+File.version: "1.0"
+
+Camera.type: "PinHole"
+
+# Camera calibration and distortion parameters (OpenCV) 
+Camera1.fx: 365.374
+Camera1.fy: 364.157
+Camera1.cx: 335.52
+Camera1.cy: 205.24
+#[-0.1446462283166632, -0.0474532692455173, 0.003920278866616698, 0.003349838009598529, 0.08225231353801284]
+Camera1.k1: -0.1446462283166632
+Camera1.k2: -0.0474532692455173
+Camera1.p1:  0.003920278866616698
+Camera1.p2:  0.003349838009598529
+Camera1.k3:  0.08225231353801284
+
+
+Camera2.fx: 369.117
+Camera2.fy: 367.656
+Camera2.cx: 349.744
+Camera2.cy: 208.525
+#[-0.1465437848833285, -0.01285400697180922, 0.002248340963218758, 0.001819119858090119, 0.0223178960508894]
+Camera2.k1: -0.1465437848833285
+Camera2.k2: -0.01285400697180922
+Camera2.p1:  0.002248340963218758
+Camera2.p2:  0.001819119858090119
+Camera2.k3:  0.0223178960508894
+
+Camera.width: 672
+Camera.height: 376
+
+# Camera frames per second 
+Camera.fps: 60
+
+# Color order of the images (0: BGR, 1: RGB. It is ignored if images are grayscale)
+Camera.RGB: 0
+
+
+
+Stereo.ThDepth: 60.0
+Stereo.T_c1_c2: !!opencv-matrix
+  rows: 4
+  cols: 4
+  dt: f
+  data: [0.999432,-0.00899332,0.032464,0.119882,
+         0.00867583,0.999913,0.00990731,0.0017503,
+        -0.0325503,-0.00962004,0.999424,-0.00421648,
+         0.0,0.0,0.0,1.000000]
+Stereo.Q: !!opencv-matrix
+   rows: 4
+   cols: 4
+   dt: d
+   data: [ 1., 0., 0., -3.6231957244873047e+02, 0., 1., 0.,
+       -1.9342808341979980e+02, 0., 0., 0., 3.6877645301949246e+02, 0.,
+       0., 2.9230082263928292e+00, 0. ]
+
+
+#--------------------------------------------------------------------------------------------
+# ORB Parameters
+#--------------------------------------------------------------------------------------------
+
+# ORB Extractor: Number of features per image
+ORBextractor.nFeatures: 2000
+
+# ORB Extractor: Scale factor between levels in the scale pyramid 	
+ORBextractor.scaleFactor: 1.414
+
+# ORB Extractor: Number of levels in the scale pyramid	
+ORBextractor.nLevels: 8
+
+# ORB Extractor: Fast threshold
+# Image is divided in a grid. At each cell FAST are extracted imposing a minimum response.
+# Firstly we impose iniThFAST. If no corners are detected we impose a lower value minThFAST
+# You can lower these values if your images have low contrast			
+ORBextractor.iniThFAST: 30
+ORBextractor.minThFAST: 10
+#--------------------------------------------------------------------------------------------
+# Viewer Parameters
+#--------------------------------------------------------------------------------------------
+Viewer.KeyFrameSize: 0.05
+Viewer.KeyFrameLineWidth: 1.0
+Viewer.GraphLineWidth: 0.9
+Viewer.PointSize: 2.0
+Viewer.CameraSize: 0.08
+Viewer.CameraLineWidth: 3.0
+Viewer.ViewpointX: 0.0
+Viewer.ViewpointY: -0.7
+Viewer.ViewpointZ: -1.8
+Viewer.ViewpointF: 500.0
+Viewer.imageViewScale: 1.0
+
+
+
+#--------------------------------------------------------------------------------------------
+# PointCloudMapping Parameters
+#--------------------------------------------------------------------------------------------
+PointCloudMapping.Resolution: 0.1 # voxel filter
+PointCloudMapping.MeanK: 20.0  # outlier filter
+PointCloudMapping.StdThresh: 0.5 # outlier filter
+PointCloudMapping.Unit: 1.0 # mm(1000) or m(1) 
+PointCloudMapping.mindisp: 1.0 
+PointCloudMapping.maxdisp: 32.0

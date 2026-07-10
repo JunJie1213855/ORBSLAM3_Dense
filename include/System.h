@@ -41,7 +41,10 @@
 #include "Settings.h"
 #include "PointCloudMapping.h"
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> origin/main
 namespace ORB_SLAM3
 {
 
@@ -72,6 +75,10 @@ public:
     }
 };
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> origin/main
 class PointCloudMapping;
 class Viewer;
 class FrameDrawer;
@@ -82,6 +89,10 @@ class LocalMapping;
 class LoopClosing;
 class Settings;
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> origin/main
 class System
 {
 public:
@@ -110,6 +121,13 @@ public:
     // Input images: RGB (CV_8UC3) or grayscale (CV_8U). RGB is converted to grayscale.
     // Returns the camera pose (empty if tracking fails).
     Sophus::SE3f TrackStereo(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timestamp, const vector<IMU::Point>& vImuMeas = vector<IMU::Point>(), string filename="");
+<<<<<<< HEAD
+=======
+    
+    // Proccess the given stereo frame. Images must be synchronized and rectified.
+    // Input images: RGB (CV_8UC3) or grayscale (CV_8U). RGB is converted to grayscale.
+    // Returns the camera pose (empty if tracking fails).
+>>>>>>> origin/main
     // 稠密重建
     Sophus::SE3f TrackStereo(const cv::Mat &imLeft, const cv::Mat &imRight,const cv::Mat& imDisp,const double &timestamp, const vector<IMU::Point>& vImuMeas = vector<IMU::Point>(), string filename="");
 
@@ -266,6 +284,10 @@ private:
     string mStrVocabularyFilePath;
 
     Settings* settings_;
+<<<<<<< HEAD
+=======
+    
+>>>>>>> origin/main
 
     // for dense mapping
     shared_ptr<PointCloudMapping> mpPointCloudMapping;

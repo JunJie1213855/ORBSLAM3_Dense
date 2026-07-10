@@ -1,0 +1,8 @@
+%YAML:1.0
+---
+width : 640
+height : 480
+unit : 1.0
+flagdistortion : 0.0
+flagGapFill : 0.0
+flagisMirror : 1.0

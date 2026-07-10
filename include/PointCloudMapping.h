@@ -25,6 +25,7 @@ namespace ORB_SLAM3
     class PointCloudMapping
     {
 
+<<<<<<< HEAD
         enum MappingSensor
         {
             RGBD = 0,
@@ -49,6 +50,28 @@ namespace ORB_SLAM3
             Stereo_type type = Stereo_type::ELAS,
             cv::Size input_size = cv::Size(),
             const std::string& model_path = ""
+=======
+    enum MappingSensor{
+        RGBD = 0,
+        STEREO
+    };
+    public:
+        using PointT = pcl::PointXYZRGB;
+        using PointCloud = pcl::PointCloud<PointT>;
+
+        // initial
+        PointCloudMapping(double resolution_,double meank_,double stdthresh_,double unit_);
+
+        // initial with the stereo matching algorithm
+        PointCloudMapping(
+            double resolution_,
+            double meank_,
+            double stdthresh_,
+            double unit_,
+            double mindisp_,
+            double maxdisp_,
+            Stereo_Algorithm::AlgorithmType type = Stereo_Algorithm::AlgorithmType::ELAS
+>>>>>>> origin/main
         );
 
         // add the Coordinate which stand for the pose into the pcl viewer
@@ -56,11 +79,19 @@ namespace ORB_SLAM3
          * @param viewer the pcl viewer
          * @param pose the pose of the camera
          * @param prefix the Coordinate name
+<<<<<<< HEAD
          */
         void addCoordinateSystem(std::shared_ptr<pcl::visualization::PCLVisualizer> viewer, const Eigen::Matrix4f &pose, const std::string &prefix);
 
         // shut down the mapping
         // save the point cloud mappping
+=======
+        */
+        void addCoordinateSystem(std::shared_ptr<pcl::visualization::PCLVisualizer> viewer, const Eigen::Matrix4f &pose, const std::string &prefix);
+
+        // shut down the mapping 
+        // save the point cloud mappping 
+>>>>>>> origin/main
         void shutdown();
 
         // viewer thread
@@ -69,7 +100,13 @@ namespace ORB_SLAM3
         // save the point cloud to pcd
         void save();
 
+<<<<<<< HEAD
     public:
+=======
+
+    public:
+
+>>>>>>> origin/main
         // -----------------------------------------------------------------------------------
         // 插入keyframe，并且更新地图
         // rgbd
@@ -83,6 +120,11 @@ namespace ORB_SLAM3
         // stereo with the disp
         void insertKeyFrame(KeyFrame *kf, cv::Mat &left, cv::Mat &right, cv::Mat &disp, cv::Mat &Q);
 
+<<<<<<< HEAD
+=======
+
+
+>>>>>>> origin/main
     protected:
         // rgbd dense mapping
         //
@@ -98,10 +140,17 @@ namespace ORB_SLAM3
         // the difference bewteen the front one is that the input include the disparity image
         PointCloud::Ptr GetPointCloud(KeyFrame *kf, cv::Mat &left, cv::Mat &right, cv::Mat &disp, cv::Mat &Q);
 
+<<<<<<< HEAD
     public:
         // to judge the sensor is rgbd or stereo
         MappingSensor mSensor;
 
+=======
+
+    public:
+        // to judge the sensor is rgbd or stereo
+        MappingSensor mSensor;
+>>>>>>> origin/main
     protected:
         // 视差计算
         std::shared_ptr<Stereo_Algorithm> stereo;
@@ -129,7 +178,11 @@ namespace ORB_SLAM3
         std::vector<cv::Mat> dispImgs;
         cv::Mat Q;
 
+<<<<<<< HEAD
         // 处理完的上一帧编号
+=======
+        // 前一帧索引
+>>>>>>> origin/main
         uint16_t lastKeyframeSize = 0;
 
         // 降采样
@@ -141,8 +194,16 @@ namespace ORB_SLAM3
         double stdthresh = 1;
         pcl::StatisticalOutlierRemoval<PointT> sor;
         // 单位
+<<<<<<< HEAD
         double unit = 1000; // defalut mm
     };
 }
 
 #endif
+=======
+        double unit = 1000; //defalut mm
+    };
+}
+
+#endif
+>>>>>>> origin/main

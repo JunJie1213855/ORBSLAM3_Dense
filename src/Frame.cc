@@ -385,7 +385,11 @@ Frame::Frame(const cv::Mat &imGray, const double &timeStamp, ORBextractor* extra
 void Frame::AssignFeaturesToGrid()
 {
     // Fill matrix with points
+<<<<<<< HEAD
     const int nCells = FRAME_GRID_COLS*FRAME_GRID_ROWS;
+=======
+    const int nCells = FRAME_GRID_COLS * FRAME_GRID_ROWS;
+>>>>>>> origin/main
 
     int nReserve = 0.5f*N/(nCells);
 
