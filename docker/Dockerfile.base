@@ -1,0 +1,80 @@
+# =============================================================================
+# ORB_SLAM3 Dense — Base Edition (ELAS / SGBM, CPU only)
+# =============================================================================
+# Build:
+#   docker build -f Dockerfile.base -t orbslam3-dense:base .
+# Run:
+#   docker run -it --rm -v /path/to/dataset:/data orbslam3-dense:base \
+#       ./Examples/Stereo-Inertial/stereo_inertial_euroc \
+#       Vocabulary/ORBvoc.txt \
+#       Examples/Stereo-Inertial/EuRoC_dense_sgbm.yaml \
+#       /data/V1_01_easy \
+#       Examples/Stereo-Inertial/EuRoC_TimeStamps/V101.txt
+# =============================================================================
+
+FROM ubuntu:22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=Etc/UTC
+
+# ---- system & build tools ----
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential cmake git wget unzip tar ca-certificates \
+    pkg-config ninja-build \
+    && rm -rf /var/lib/apt/lists/*
+
+# ---- ORB_SLAM3 core dependencies ----
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libopencv-dev \
+    libeigen3-dev \
+    libboost-filesystem-dev \
+    libboost-program-options-dev \
+    libboost-serialization-dev \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# ---- Pangolin (build from source) ----
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libgl1-mesa-dev libglew-dev libglfw3-dev libwayland-dev \
+    libx11-dev libxrandr-dev libxi-dev libxxf86vm-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+ARG PANGOLIN_VERSION=v0.8
+RUN git clone --depth 1 --branch ${PANGOLIN_VERSION} \
+    https://github.com/stevenlovegrove/Pangolin.git /tmp/pangolin && \
+    cd /tmp/pangolin && \
+    cmake -B build -DCMAKE_BUILD_TYPE=Release \
+        -DBUILD_EXAMPLES=OFF -DBUILD_TESTS=OFF && \
+    cmake --build build -j$(nproc) && \
+    cmake --install build && \
+    rm -rf /tmp/pangolin
+
+# ---- Dense mapping dependencies ----
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpcl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# ---- Copy ORB_SLAM3 source ----
+WORKDIR /opt/orbslam3
+COPY . .
+
+# ---- Build Thirdparty libraries ----
+RUN cd Thirdparty/DBoW2 && mkdir -p build && cd build && \
+    cmake .. -DCMAKE_BUILD_TYPE=Release && make -j$(nproc)
+
+RUN cd Thirdparty/g2o && mkdir -p build && cd build && \
+    cmake .. -DCMAKE_BUILD_TYPE=Release && make -j$(nproc)
+
+# ---- Build ELAS (dense stereo) ----
+RUN cd Thirdparty/elas && mkdir -p build && cd build && \
+    cmake .. -DCMAKE_BUILD_TYPE=Release && make -j$(nproc)
+
+# ---- Extract ORB vocabulary ----
+RUN cd Vocabulary && tar -xf ORBvoc.txt.tar.gz
+
+# ---- Build ORB_SLAM3 ----
+RUN mkdir -p build && cd build && \
+    cmake .. -DCMAKE_BUILD_TYPE=Release && \
+    make -j$(nproc)
+
+WORKDIR /opt/orbslam3/Examples/Stereo-Inertial
