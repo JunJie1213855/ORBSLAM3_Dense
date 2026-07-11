@@ -89,3 +89,60 @@ Migrate RGBD + Stereo dense point cloud mapping (including TensorRT inference) f
 ### Issue 12: OpenCV color conversion constant names
 **Problem:** The new GrabImageStereo overload used deprecated OpenCV constants: `CV_RGB2GRAY`, `CV_BGR2GRAY`, `CV_RGBA2GRAY`, `CV_BGRA2GRAY`.
 **Solution:** Replaced with the constants used by the original GrabImageStereo method in the same file (e.g., `cv::COLOR_RGB2GRAY`, `cv::COLOR_BGR2GRAY`).
+
+---
+
+## Real-Time Point Cloud Visualization Optimization
+
+**Problem:** With PointCloudMapping 3D dense mapping visualization enabled, the viewer was extremely laggy and effectively frozen — mouse rotate/pan barely responded and the point cloud did not appear.
+
+### Root causes
+1. **Rendering coupled to keyframe processing.** The single `viewer()` thread only called Pangolin `FinishFrame()` when a new keyframe arrived. Between keyframes (and whenever the camera was stationary) the window never repainted, so interaction froze. Interactive viewing needs a continuous ~30-60Hz render loop, decoupled from data production.
+2. **Point cloud never rendered.** The old Pangolin block only drew trajectory axes — it never drew the accumulated points at all.
+3. **Quadratic per-keyframe filtering.** VoxelFilter + OutlierFilter ran over the ENTIRE accumulated `globalMap` on EVERY keyframe → O(K·N) behavior. As the map grew to hundreds of thousands / millions of points (~351k points per keyframe in the EuRoC test), the thread blocked for seconds.
+
+### Solution: two-thread architecture in PointCloudMapping
+- **Processing thread `viewer()`** (data production, ZERO Pangolin/GL calls):
+  - Generates point clouds and VoxelFilters only the NEW per-keyframe points (fast, bounded work).
+  - Merges into `globalMap` via an incremental voxel-dedup hash set `mOccupiedVoxels` — O(new points) instead of O(total).
+  - Runs OutlierFilter on the full map only every 20 keyframes rather than every keyframe.
+  - Snapshots recent camera poses for the render thread.
+- **Render thread `renderLoop()`** (owns the Pangolin GL context):
+  - Continuous ~60Hz loop (15ms sleep) so the window always repaints and stays interactive.
+  - Uploads `globalMap` to a GPU VBO only when the `mbCloudUpdated` dirty flag is set, with display decimation: `stride = max(1, N / 500000)` for clouds larger than 500k points.
+  - Renders the colored point cloud via `pangolin::RenderVboCbo`.
+  - Draws RGB coordinate-axis triads at each keyframe pose (last 200) plus the world origin.
+
+**Thread-safety:** `globalMap` is protected by `mMutexGlobalMap` (accessed by both threads); poses are snapshotted into `mPoseSnapshot` under `mMutexPoses`; `mbCloudUpdated` is atomic; all GL calls are confined to the render thread; `shutdown()` joins BOTH threads before `save()`.
+
+**Also removed:** a stray `cv::imshow("disp")` / `cv::waitKey(1)` disparity-preview window that opened from the processing thread (a competing OpenCV window, unwanted for clean single-window visualization).
+
+### Pangolin 0.8 API gotchas
+- `pangolin::GlBuffer` must be default-constructed, then `.Reinitialise(pangolin::GlArrayBuffer, N, GL_FLOAT, 3, GL_DYNAMIC_DRAW)` — do NOT pass the buffer type to the constructor.
+- `pangolin::glDrawAxis(size)` exists; `pangolin::DrawAxis` does NOT.
+- Use `pangolin::RenderVboCbo(vbo, cbo, true)` for colored point clouds.
+
+### Verification result — ACCEPT
+Verified via agent team:
+- **Build:** clean (`Built target ORB_SLAM3`, zero errors).
+- **Thread-safety review:** clean — no data races or deadlocks, GL confined to the render thread, both threads joined on shutdown.
+- **Runtime test:** ran 60s processing 113 keyframes with no SIGSEGV/abort.
+
+### Issue: Follow-camera SIGSEGV — std::vector<Eigen::Matrix4f> alignment under AVX
+**Problem:** After adding follow-camera mode to the dense viewer (view tracks the latest camera pose along its forward axis), the render thread crashed intermittently with SIGSEGV inside `renderLoop()`. Symptoms of a Heisenbug: crashed after 1–11 keyframes when run normally, but ran cleanly for 30–60s under gdb, and ran clean when the follow matrix math was disabled.
+
+**Root cause:** `mPoseSnapshot` was declared as `std::vector<Eigen::Matrix4f>`. The project compiles with `-march=native`, which enables AVX. Under AVX, Eigen requires **32-byte alignment** for fixed-size `Matrix4f` (64 bytes) and emits aligned loads (`vmovaps`). But `std::vector`'s default allocator only guarantees **16-byte** alignment on x86-64, so the pose matrices in the vector were misaligned → aligned AVX loads faulted. The bug was heap-layout-dependent (hence intermittent) and the follow-camera code's extra Eigen ops made it near-deterministic. It was NOT a threading bug (all shared state was correctly mutex-protected) and NOT a two-Pangolin-window conflict (crash persisted with the sparse viewer disabled).
+
+**Solution:** Use `Eigen::aligned_allocator` for both the member and the local snapshot vector:
+```cpp
+std::vector<Eigen::Matrix4f, Eigen::aligned_allocator<Eigen::Matrix4f>> mPoseSnapshot;
+```
+After this, the dense point cloud + pose viewer runs cleanly (67 keyframes, no crash), and coexists with ORB-SLAM3's own sparse Pangolin viewer (two windows in two threads).
+
+**Follow-camera note:** `pangolin::OpenGlRenderState::Follow()` and `SetModelViewMatrix()` from the render thread were also unstable; the stable approach is to leave `cam_state` untouched (so Handler3D keeps working) and override the GL modelview directly after `Activate()`:
+```cpp
+Eigen::Matrix4f mv = followOffset * latestTwc.inverse();  // followOffset captured once from ModelViewLookAt
+glMatrixMode(GL_MODELVIEW);
+glLoadMatrixf(mv.data());   // Eigen col-major == OpenGL col-major
+```
+Press `f` in the dense window to toggle follow / free-look.

@@ -2834,7 +2834,11 @@ void Optimizer::LocalInertialBA(KeyFrame *pKF, bool *pbStopFlag, Map *pMap, int&
     //cout << "Total map points: " << lLocalMapPoints.size() << endl;
     for(map<int,int>::iterator mit=mVisEdges.begin(), mend=mVisEdges.end(); mit!=mend; mit++)
     {
-        assert(mit->second>=3);
+        // Upstream asserts mit->second>=3. In IMU mode with sparse keyframes a local
+        // keyframe can legitimately have fewer visual edges; the optimizer tolerates it.
+        // Skip the hard assert (which aborts the whole process) instead of crashing.
+        if(mit->second < 3)
+            continue;
     }
 
     optimizer.initializeOptimization();

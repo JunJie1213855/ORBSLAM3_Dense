@@ -7,8 +7,11 @@
 #include "Converter.h"
 #include <KeyFrame.h>
 #include <unordered_map>
+#include <unordered_set>
+#include <algorithm>
 #include <cmath>
 #include <chrono>
+#include <thread>
 #include <pangolin/pangolin.h>
 
 namespace ORB_SLAM3
@@ -58,6 +61,7 @@ namespace ORB_SLAM3
         globalMap.reset(new pcl::PointCloud<pcl::PointXYZRGB>);
         // 线程
         viewerThread = make_unique<thread>(bind(&PointCloudMapping::viewer, this));
+        renderThread = std::make_unique<std::thread>(std::bind(&PointCloudMapping::renderLoop, this));
     }
     PointCloudMapping::PointCloudMapping(
         double resolution_,
@@ -97,6 +101,7 @@ namespace ORB_SLAM3
 
         // 线程
         viewerThread = make_unique<thread>(bind(&PointCloudMapping::viewer, this));
+        renderThread = std::make_unique<std::thread>(std::bind(&PointCloudMapping::renderLoop, this));
     }
 
     void PointCloudMapping::shutdown()
@@ -105,7 +110,10 @@ namespace ORB_SLAM3
             shutDownFlag.store(true);
             keyFrameUpdated.notify_all();
         }
-        viewerThread->join();
+        if (viewerThread && viewerThread->joinable())
+            viewerThread->join();
+        if (renderThread && renderThread->joinable())
+            renderThread->join();
         save();
     }
 
@@ -221,14 +229,6 @@ namespace ORB_SLAM3
         cv::Mat right_r = right.clone();
         // 视差计算
         cv::Mat disp = stereo->inference(left_r, right_r);
-        cv::Mat disp_viz;
-        double min, max;
-        cv::minMaxLoc(disp, &min, &max);
-        disp_viz = (disp - min) / (max - min) * 255;
-        disp_viz.convertTo(disp_viz, CV_8U);
-        cv::applyColorMap(disp_viz, disp_viz, cv::COLORMAP_JET);
-        cv::imshow("disp", disp_viz);
-        cv::waitKey(1);
 
         // 3D 点转换
         cv::Mat points_image;
@@ -438,114 +438,79 @@ namespace ORB_SLAM3
                     local_Q = Q.clone();
                     // std::cout << "[DEBUG viewer] data copied, lock released" << std::endl;
                 }
-                // Process from local copies
-                PointCloud::Ptr p;
-                if (mSensor == MappingSensor::RGBD)
+                // Generate point clouds for the new keyframes into a temp cloud
+                PointCloud::Ptr newCloud(new PointCloud());
+                for (size_t i = 0; i < local_kfs.size(); i++)
                 {
-                    for (size_t i = 0; i < local_kfs.size(); i++)
-                    {
-                        // std::cout << "[DEBUG viewer] RGBD GetPointCloud for KF id=" << local_kfs[i]->mnId << std::endl;
+                    if (shutDownFlag.load()) break;
+                    PointCloud::Ptr p;
+                    if (mSensor == MappingSensor::RGBD)
                         p = GetPointCloud(local_kfs[i], local_colors[i], local_depths[i]);
-                        // std::cout << "[DEBUG viewer] RGBD cloud size=" << p->points.size() << ", globalMap before merge=" << globalMap->points.size() << std::endl;
-                        (*globalMap) += *p;
-                        // std::cout << "[DEBUG viewer] RGBD after merge, globalMap size=" << globalMap->points.size() << std::endl;
-                        p.reset();
-                    }
+                    else if (local_disps.empty())
+                        p = GetPointCloud(local_kfs[i], local_colors[i], local_rights[i], local_Q);
+                    else
+                        p = GetPointCloud(local_kfs[i], local_colors[i], local_rights[i], local_disps[i], local_Q);
+                    if (p && !p->points.empty())
+                        (*newCloud) += *p;
                 }
-                else if (mSensor == MappingSensor::STEREO)
+
+                // Voxel-filter ONLY the new points (small, fast)
+                if (!newCloud->points.empty())
+                    VoxelFilter(newCloud);
+
+                // voxel key helper (incremental dedup)
+                auto voxelKey = [this](const PointT &pt) -> uint64_t {
+                    const double inv = 1.0 / resolution;
+                    int64_t ix = static_cast<int64_t>(std::floor(pt.x * inv));
+                    int64_t iy = static_cast<int64_t>(std::floor(pt.y * inv));
+                    int64_t iz = static_cast<int64_t>(std::floor(pt.z * inv));
+                    uint64_t h = 14695981039346656037ULL;
+                    h = (h ^ static_cast<uint64_t>(ix)) * 1099511628211ULL;
+                    h = (h ^ static_cast<uint64_t>(iy)) * 1099511628211ULL;
+                    h = (h ^ static_cast<uint64_t>(iz)) * 1099511628211ULL;
+                    return h;
+                };
+
+                // Incremental merge into globalMap (O(new points), not O(total))
                 {
-                    for (size_t i = 0; i < local_kfs.size(); i++)
+                    std::lock_guard<std::mutex> lk(mMutexGlobalMap);
+                    for (const auto &pt : newCloud->points)
                     {
-                        // std::cout << "[DEBUG viewer] STEREO GetPointCloud for KF id=" << local_kfs[i]->mnId << std::endl;
-                        if (local_disps.empty())
-                        {
-                            p = GetPointCloud(local_kfs[i], local_colors[i], local_rights[i], local_Q);
-                            // std::cout << "[DEBUG viewer] STEREO cloud size=" << p->points.size() << ", globalMap before merge=" << globalMap->points.size() << std::endl;
-                            (*globalMap) += *p;
-                            // std::cout << "[DEBUG viewer] STEREO after merge, globalMap size=" << globalMap->points.size() << std::endl;
-                            p.reset();
-                        }
-                        else
-                        {
-                            p = GetPointCloud(local_kfs[i], local_colors[i], local_rights[i], local_disps[i], local_Q);
-                            // std::cout << "[DEBUG viewer] STEREO(disp) cloud size=" << p->points.size() << ", globalMap before merge=" << globalMap->points.size() << std::endl;
-                            (*globalMap) += *p;
-                            // std::cout << "[DEBUG viewer] STEREO(disp) after merge, globalMap size=" << globalMap->points.size() << std::endl;
-                            p.reset();
-                        }
+                        if (mOccupiedVoxels.insert(voxelKey(pt)).second)
+                            globalMap->points.push_back(pt);
                     }
+                    globalMap->width = globalMap->points.size();
+                    globalMap->height = 1;
+                    globalMap->is_dense = false;
+
+                    // Periodic outlier cleanup (every 20 keyframes) to keep map clean
+                    static int filterCounter = 0;
+                    if (++filterCounter >= 20 && !shutDownFlag.load())
+                    {
+                        filterCounter = 0;
+                        OutlierFilter(globalMap);
+                        mOccupiedVoxels.clear();
+                        for (const auto &pt : globalMap->points)
+                            mOccupiedVoxels.insert(voxelKey(pt));
+                    }
+                    mbCloudUpdated.store(true);
                 }
-                if (globalMap && !globalMap->points.empty())
+
+                // Snapshot recent poses for the render thread
                 {
-                    VoxelFilter(globalMap);
-                    OutlierFilter(globalMap);
+                    std::vector<Eigen::Matrix4f, Eigen::aligned_allocator<Eigen::Matrix4f>> poses;
+                    {
+                        unique_lock<mutex> lck(keyFrameUpdateMutex);
+                        size_t startIdx = (keyframes.size() > 200) ? keyframes.size() - 200 : 0;
+                        for (size_t i = startIdx; i < keyframes.size(); i++)
+                            if (keyframes[i] && !keyframes[i]->isBad())
+                                poses.push_back(keyframes[i]->GetPoseInverse().matrix());
+                    }
+                    std::lock_guard<std::mutex> lk(mMutexPoses);
+                    mPoseSnapshot.swap(poses);
                 }
 
-                // --- Pangolin: camera trajectory ---                // --- Pangolin: camera trajectory ---
-                {
-                    static bool pango_init = false;
-                    static std::unique_ptr<pangolin::OpenGlRenderState> cam_state;
-                    static pangolin::View *view3d = nullptr;
-
-                    if (!pango_init)
-                    {
-                        try
-                        {
-                            pangolin::CreateWindowAndBind("Dense Trajectory", 1024, 768);
-                            glEnable(GL_DEPTH_TEST);
-                            cam_state.reset(new pangolin::OpenGlRenderState(
-                                pangolin::ProjectionMatrix(1024, 768, 500, 500, 512, 384, 0.1, 1000),
-                                pangolin::ModelViewLookAt(0, -5, -10, 0, 0, 0, pangolin::AxisNegY)));
-                            view3d = &pangolin::CreateDisplay()
-                                          .SetBounds(0.0, 1.0, 0.0, 1.0)
-                                          .SetHandler(new pangolin::Handler3D(*cam_state));
-                            pango_init = true;
-                        }
-                        catch (...)
-                        {
-                            pango_init = false;
-                        }
-                    }
-
-                    if (pango_init)
-                    {
-                        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-                        view3d->Activate(*cam_state);
-                        pangolin::glDrawAxis(0.2f);
-
-                        if (!keyframes.empty())
-                        {
-                            size_t start = (keyframes.size() > 100) ? keyframes.size() - 100 : 0;
-                            for (size_t i = start; i < keyframes.size(); i++)
-                            {
-                                if (keyframes[i] && !keyframes[i]->isBad())
-                                {
-                                    pangolin::OpenGlMatrix Twc(keyframes[i]->GetPoseInverse().matrix());
-                                    glPushMatrix();
-                                    glMultMatrixd(Twc.m);
-                                    // Draw RGB axes at each camera pose
-                                    const float s = 0.08f;
-                                    glLineWidth(2.0f);
-                                    glBegin(GL_LINES);
-                                    glColor3f(1, 0, 0);
-                                    glVertex3f(0, 0, 0);
-                                    glVertex3f(s, 0, 0);
-                                    glColor3f(0, 1, 0);
-                                    glVertex3f(0, 0, 0);
-                                    glVertex3f(0, s, 0);
-                                    glColor3f(0, 0, 1);
-                                    glVertex3f(0, 0, 0);
-                                    glVertex3f(0, 0, s);
-                                    glEnd();
-                                    glPopMatrix();
-                                }
-                            }
-                        }
-
-                        pangolin::FinishFrame();
-                    }
-                }
-                lastKeyframeSize = N;
+                                lastKeyframeSize = N;
                 // std::cout << "[DEBUG viewer] === loop end, lastKeyframeSize=" << lastKeyframeSize << " ===" << std::endl;
             }
             catch (const std::exception &e)
@@ -635,6 +600,142 @@ namespace ORB_SLAM3
             if (neighbors >= meank) filtered->points.push_back(pt);
         }
         if (!shutDownFlag.load()) *cloud = *filtered;
+    }
+
+    // dedicated render thread: owns Pangolin GL context, runs continuously ~60 Hz
+    void PointCloudMapping::renderLoop()
+    {
+        std::unique_ptr<pangolin::OpenGlRenderState> cam_state;
+        pangolin::View *view3d = nullptr;
+        pangolin::GlBuffer vbo, cbo;
+        size_t vboCount = 0;
+
+        try
+        {
+            pangolin::CreateWindowAndBind("Dense PointCloud + Pose", 1024, 768);
+            glEnable(GL_DEPTH_TEST);
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+            cam_state.reset(new pangolin::OpenGlRenderState(
+                pangolin::ProjectionMatrix(1024, 768, 500, 500, 512, 384, 0.1, 1000),
+                pangolin::ModelViewLookAt(0, -2, -4, 0, 0, 0, pangolin::AxisNegY)));
+            view3d = &pangolin::CreateDisplay()
+                          .SetBounds(0.0, 1.0, 0.0, 1.0)
+                          .SetHandler(new pangolin::Handler3D(*cam_state));
+            // press 'f' to toggle follow-camera mode
+            pangolin::RegisterKeyPressCallback('f', [this]() {
+                mbFollowCamera.store(!mbFollowCamera.load());
+            });
+        }
+        catch (...)
+        {
+            std::cerr << "[render] Pangolin init failed (headless?), skipping visualization" << std::endl;
+            return;
+        }
+
+        // capture the fixed third-person offset (ModelViewLookAt) as Eigen (column-major = GL layout)
+        Eigen::Matrix4f followOffset = Eigen::Matrix4f::Identity();
+        {
+            pangolin::OpenGlMatrix off = cam_state->GetModelViewMatrix();
+            for (int i = 0; i < 16; i++)
+                followOffset(i % 4, i / 4) = static_cast<float>(off.m[i]);
+        }
+
+        while (!shutDownFlag.load() && !pangolin::ShouldQuit())
+        {
+            glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+            view3d->Activate(*cam_state);
+
+            // follow-camera: override the GL modelview so the view sits behind the latest
+            // camera pose looking along its forward axis. We do NOT mutate cam_state (that
+            // crashes and would fight Handler3D) -- just load the matrix directly.
+            if (mbFollowCamera.load())
+            {
+                Eigen::Matrix4f latestTwc = Eigen::Matrix4f::Identity();
+                bool hasPose = false;
+                {
+                    std::lock_guard<std::mutex> lk(mMutexPoses);
+                    if (!mPoseSnapshot.empty())
+                    {
+                        latestTwc = mPoseSnapshot.back();
+                        hasPose = true;
+                    }
+                }
+                if (hasPose)
+                {
+                    Eigen::Matrix4f mv = followOffset * latestTwc.inverse();
+                    glMatrixMode(GL_MODELVIEW);
+                    glLoadMatrixf(mv.data());
+                }
+            }
+
+            // world origin axis
+            pangolin::glDrawAxis(0.3f);
+
+            // rebuild VBO only when the cloud changed
+            if (mbCloudUpdated.exchange(false))
+            {
+                std::vector<float> verts;
+                std::vector<unsigned char> cols;
+                {
+                    std::lock_guard<std::mutex> lk(mMutexGlobalMap);
+                    size_t n = globalMap->points.size();
+                    int stride = std::max<int>(1, static_cast<int>(n / 500000));
+                    mDisplayStride = stride;
+                    verts.reserve((n / stride) * 3);
+                    cols.reserve((n / stride) * 3);
+                    for (size_t i = 0; i < n; i += stride)
+                    {
+                        const auto &pt = globalMap->points[i];
+                        verts.push_back(pt.x);
+                        verts.push_back(pt.y);
+                        verts.push_back(pt.z);
+                        cols.push_back(pt.r);
+                        cols.push_back(pt.g);
+                        cols.push_back(pt.b);
+                    }
+                }
+                vboCount = verts.size() / 3;
+                if (vboCount > 0)
+                {
+                    vbo.Reinitialise(pangolin::GlArrayBuffer, vboCount, GL_FLOAT, 3, GL_DYNAMIC_DRAW);
+                    vbo.Upload(verts.data(), verts.size() * sizeof(float));
+                    cbo.Reinitialise(pangolin::GlArrayBuffer, vboCount, GL_UNSIGNED_BYTE, 3, GL_DYNAMIC_DRAW);
+                    cbo.Upload(cols.data(), cols.size() * sizeof(unsigned char));
+                }
+            }
+
+            // draw dense point cloud
+            if (vboCount > 0)
+            {
+                glPointSize(2.0f);
+                pangolin::RenderVboCbo(vbo, cbo, true);
+            }
+
+            // draw camera pose axes from snapshot
+            {
+                std::lock_guard<std::mutex> lk(mMutexPoses);
+                for (const auto &Twc : mPoseSnapshot)
+                {
+                    pangolin::OpenGlMatrix m(Twc);
+                    glPushMatrix();
+                    glMultMatrixd(m.m);
+                    const float s = 0.08f;
+                    glLineWidth(2.0f);
+                    glBegin(GL_LINES);
+                    glColor3f(1, 0, 0); glVertex3f(0, 0, 0); glVertex3f(s, 0, 0);
+                    glColor3f(0, 1, 0); glVertex3f(0, 0, 0); glVertex3f(0, s, 0);
+                    glColor3f(0, 0, 1); glVertex3f(0, 0, 0); glVertex3f(0, 0, s);
+                    glEnd();
+                    glPopMatrix();
+                }
+            }
+
+            pangolin::FinishFrame();
+            std::this_thread::sleep_for(std::chrono::milliseconds(15));
+        }
     }
 
     // save the point cloud to ply

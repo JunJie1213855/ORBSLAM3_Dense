@@ -18,6 +18,10 @@
 #include <vector>
 #include <condition_variable>
 #include <atomic>
+#include <unordered_set>
+#include <memory>
+#include <cstdint>
+#include <Eigen/Core>
 
 namespace ORB_SLAM3
 {
@@ -63,8 +67,11 @@ namespace ORB_SLAM3
         // save the point cloud mappping
         void shutdown();
 
-        // viewer thread
+        // viewer thread (point cloud generation / processing)
         void viewer();
+
+        // render thread (owns Pangolin GL context, ~30-60 Hz)
+        void renderLoop();
 
         // save the point cloud to pcd
         void save();
@@ -116,6 +123,29 @@ namespace ORB_SLAM3
 
         // 单一线程 , 用 std::move
         std::unique_ptr<thread> viewerThread;
+
+        // 专用渲染线程 (拥有 Pangolin GL 上下文)
+        std::unique_ptr<std::thread> renderThread;
+
+        // 保护 globalMap 的互斥锁 (处理线程 <-> 渲染线程)
+        std::mutex mMutexGlobalMap;
+
+        // 点云脏标志: 处理线程更新 globalMap 后置 true, 渲染线程上传 VBO 后置 false
+        std::atomic<bool> mbCloudUpdated{false};
+
+        // 相机位姿快照 (Twc), 供渲染线程绘制坐标轴
+        // aligned_allocator: Matrix4f 在 AVX (-march=native) 下需 32 字节对齐, 否则崩溃
+        std::vector<Eigen::Matrix4f, Eigen::aligned_allocator<Eigen::Matrix4f>> mPoseSnapshot;
+        std::mutex mMutexPoses;
+
+        // 已占据体素集合, 用于增量体素降采样 (O(new points))
+        std::unordered_set<uint64_t> mOccupiedVoxels;
+
+        // 显示抽稀步长 (点云过大时按 stride 上传显示)
+        int mDisplayStride = 1;
+
+        // 视角跟随相机开关 (默认开启, 渲染窗口按 'f' 键切换)
+        std::atomic<bool> mbFollowCamera{true};
 
         // 关机标志
         std::atomic<bool> shutDownFlag{false};

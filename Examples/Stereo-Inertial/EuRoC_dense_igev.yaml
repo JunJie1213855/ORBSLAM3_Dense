@@ -116,7 +116,7 @@ Viewer.imageViewScale: 1.0
 #--------------------------------------------------------------------------------------------
 # Dense Point Cloud Mapping Parameters
 #--------------------------------------------------------------------------------------------
-PointCloudMapping.Resolution: 0.5
+PointCloudMapping.Resolution: 0.1
 PointCloudMapping.MeanK: 10
 PointCloudMapping.StdThresh: 1.0
 PointCloudMapping.Unit: 1.0
