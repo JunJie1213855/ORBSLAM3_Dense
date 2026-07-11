@@ -92,8 +92,8 @@ make -j$(nproc)
 | 文件 | 稠密建图 | 立体匹配 | 适用场景 |
 |------|---------|---------|---------|
 | `EuRoC.yaml` | ❌ | — | 纯稀疏 SLAM |
-| `EuRoC_dense_elas.yaml` | ✅ | ELAS | CPU 高精度 |
-| `EuRoC_dense_sgbm.yaml` | ✅ | SGBM | CPU 快速 (**推荐**) |
+| `EuRoC_dense_elas.yaml` | ✅ | ELAS | CPU 快速高精度 |
+| `EuRoC_dense_sgbm.yaml` | ✅ | SGBM | CPU  OpenCV |
 | `EuRoC_dense_igev.yaml` | ✅ | IGEV | GPU 深度学习 |
 
 ### 运行
