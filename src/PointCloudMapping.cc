@@ -9,6 +9,7 @@
 #include <unordered_map>
 #include <cmath>
 #include <chrono>
+#include <pangolin/pangolin.h>
 
 namespace ORB_SLAM3
 {
@@ -100,31 +101,11 @@ namespace ORB_SLAM3
 
     void PointCloudMapping::shutdown()
     {
-        // std::cout << "[DEBUG] shutdown requested, notifying viewer..." << std::endl;
         {
             shutDownFlag.store(true);
             keyFrameUpdated.notify_all();
         }
-        // Wait with periodic re-notify to handle missed wakeups
-        // std::cout << "[DEBUG] waiting for viewer thread to finish..." << std::endl;
-        while (viewerThread->joinable())
-        {
-            keyFrameUpdated.notify_all();
-            // Use timed join to avoid permanent hang
-            auto start = std::chrono::steady_clock::now();
-            // poll every 500ms
-            while (viewerThread->joinable() &&
-                   std::chrono::steady_clock::now() - start < std::chrono::milliseconds(500))
-            {
-                std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            }
-            if (viewerThread->joinable())
-            {
-                // std::cout << "[DEBUG] viewer thread still running, re-notifying..." << std::endl;
-                keyFrameUpdated.notify_all();
-            }
-        }
-        // std::cout << "[DEBUG] viewer thread joined, saving..." << std::endl;
+        viewerThread->join();
         save();
     }
 
@@ -230,10 +211,24 @@ namespace ORB_SLAM3
     // stereo without the disparity image
     pcl::PointCloud<PointCloudMapping::PointT>::Ptr PointCloudMapping::GetPointCloud(KeyFrame *kf, cv::Mat &left, cv::Mat &right, cv::Mat &Q)
     {
+        // Skip if shutdown requested
+        if (shutDownFlag.load())
+        {
+            PointCloud::Ptr empty(new PointCloud());
+            return empty;
+        }
         cv::Mat left_r = left.clone();
         cv::Mat right_r = right.clone();
         // 视差计算
         cv::Mat disp = stereo->inference(left_r, right_r);
+        cv::Mat disp_viz;
+        double min, max;
+        cv::minMaxLoc(disp, &min, &max);
+        disp_viz = (disp - min) / (max - min) * 255;
+        disp_viz.convertTo(disp_viz, CV_8U);
+        cv::applyColorMap(disp_viz, disp_viz, cv::COLORMAP_JET);
+        cv::imshow("disp", disp_viz);
+        cv::waitKey(1);
 
         // 3D 点转换
         cv::Mat points_image;
@@ -250,19 +245,25 @@ namespace ORB_SLAM3
             // Check for NaN/Inf in points_image
             int nan_count = 0, inf_count = 0;
             float zmin = 1e9, zmax = -1e9;
-            for (int r = 0; r < points_image.rows; r++) {
-                const float* ptr = points_image.ptr<float>(r);
-                for (int c = 0; c < points_image.cols; c++) {
-                    float z = ptr[3*c + 2];
-                    if (std::isnan(z)) nan_count++;
-                    if (std::isinf(z)) inf_count++;
-                    if (z > zmax) zmax = z;
-                    if (z < zmin) zmin = z;
+            for (int r = 0; r < points_image.rows; r++)
+            {
+                const float *ptr = points_image.ptr<float>(r);
+                for (int c = 0; c < points_image.cols; c++)
+                {
+                    float z = ptr[3 * c + 2];
+                    if (std::isnan(z))
+                        nan_count++;
+                    if (std::isinf(z))
+                        inf_count++;
+                    if (z > zmax)
+                        zmax = z;
+                    if (z < zmin)
+                        zmin = z;
                 }
             }
             // std::cout << "[DEBUG GetPC] 3D points Z range: " << zmin << " ~ " << zmax
-                    //   << ", NaN=" << nan_count << " Inf=" << inf_count
-                    //   << ", total pixels=" << (points_image.rows * points_image.cols) << std::endl;
+            //   << ", NaN=" << nan_count << " Inf=" << inf_count
+            //   << ", total pixels=" << (points_image.rows * points_image.cols) << std::endl;
         }
 
         PointCloud::Ptr tmp(new PointCloud());
@@ -310,15 +311,27 @@ namespace ORB_SLAM3
         // // std::cout << "z max " << zmax << std::endl;
         // Diagnostic: check world-frame point cloud
         {
-            float cxmin=1e9, cxmax=-1e9, cymin=1e9, cymax=-1e9, czmin=1e9, czmax=-1e9;
-            int cnan=0, cinf=0;
-            for (size_t i=0; i<cloud->points.size(); i++) {
-                float x=cloud->points[i].x, y=cloud->points[i].y, z=cloud->points[i].z;
-                if(std::isnan(x)||std::isnan(y)||std::isnan(z)) cnan++;
-                if(std::isinf(x)||std::isinf(y)||std::isinf(z)) cinf++;
-                if(x<cxmin) cxmin=x; if(x>cxmax) cxmax=x;
-                if(y<cymin) cymin=y; if(y>cymax) cymax=y;
-                if(z<czmin) czmin=z; if(z>czmax) czmax=z;
+            float cxmin = 1e9, cxmax = -1e9, cymin = 1e9, cymax = -1e9, czmin = 1e9, czmax = -1e9;
+            int cnan = 0, cinf = 0;
+            for (size_t i = 0; i < cloud->points.size(); i++)
+            {
+                float x = cloud->points[i].x, y = cloud->points[i].y, z = cloud->points[i].z;
+                if (std::isnan(x) || std::isnan(y) || std::isnan(z))
+                    cnan++;
+                if (std::isinf(x) || std::isinf(y) || std::isinf(z))
+                    cinf++;
+                if (x < cxmin)
+                    cxmin = x;
+                if (x > cxmax)
+                    cxmax = x;
+                if (y < cymin)
+                    cymin = y;
+                if (y > cymax)
+                    cymax = y;
+                if (z < czmin)
+                    czmin = z;
+                if (z > czmax)
+                    czmax = z;
             }
             // std::cout << "[DEBUG GetPC] world cloud: X["<<cxmin<<","<<cxmax<<"] Y["<<cymin<<","<<cymax<<"] Z["<<czmin<<","<<czmax<<"], NaN="<<cnan<<" Inf="<<cinf<< std::endl;
         }
@@ -462,115 +475,76 @@ namespace ORB_SLAM3
                         }
                     }
                 }
-                // Manual voxel filter + outlier removal (bypass PCL filter bugs)
                 if (globalMap && !globalMap->points.empty())
                 {
-                    auto t0 = std::chrono::steady_clock::now();
-                    auto t1 = t0;
-                    // std::cout << "[DEBUG viewer] manual filter start, input=" << globalMap->points.size()
-                            //   << " leaf=" << resolution << std::endl;
+                    VoxelFilter(globalMap);
+                    OutlierFilter(globalMap);
+                }
 
-                    // Step 1: Simple voxel grid using hash map
+                // --- Pangolin: camera trajectory ---                // --- Pangolin: camera trajectory ---
+                {
+                    static bool pango_init = false;
+                    static std::unique_ptr<pangolin::OpenGlRenderState> cam_state;
+                    static pangolin::View *view3d = nullptr;
+
+                    if (!pango_init)
                     {
-                        auto voxel_hash = [this](const PointT& pt) -> uint64_t {
-                            int64_t ix = static_cast<int64_t>(std::floor(pt.x / resolution));
-                            int64_t iy = static_cast<int64_t>(std::floor(pt.y / resolution));
-                            int64_t iz = static_cast<int64_t>(std::floor(pt.z / resolution));
-                            // FNV-like hash
-                            uint64_t h = 14695981039346656037ULL;
-                            h = (h ^ static_cast<uint64_t>(ix)) * 1099511628211ULL;
-                            h = (h ^ static_cast<uint64_t>(iy)) * 1099511628211ULL;
-                            h = (h ^ static_cast<uint64_t>(iz)) * 1099511628211ULL;
-                            return h;
-                        };
-                        auto voxel_equal = [this](const PointT& a, const PointT& b) -> bool {
-                            int64_t ax = static_cast<int64_t>(std::floor(a.x / resolution));
-                            int64_t ay = static_cast<int64_t>(std::floor(a.y / resolution));
-                            int64_t az = static_cast<int64_t>(std::floor(a.z / resolution));
-                            int64_t bx = static_cast<int64_t>(std::floor(b.x / resolution));
-                            int64_t by = static_cast<int64_t>(std::floor(b.y / resolution));
-                            int64_t bz = static_cast<int64_t>(std::floor(b.z / resolution));
-                            return ax == bx && ay == by && az == bz;
-                        };
-                        std::unordered_map<PointT, bool, decltype(voxel_hash), decltype(voxel_equal)> voxel_map(
-                            1024, voxel_hash, voxel_equal);
-                        PointCloud::Ptr filtered(new PointCloud());
-                        filtered->points.reserve(globalMap->points.size() / 10);
-                        for (const auto& pt : globalMap->points) {
-                            if (shutDownFlag.load()) break;
-                            if (voxel_map.find(pt) == voxel_map.end()) {
-                                voxel_map[pt] = true;
-                                filtered->points.push_back(pt);
-                            }
+                        try
+                        {
+                            pangolin::CreateWindowAndBind("Dense Trajectory", 1024, 768);
+                            glEnable(GL_DEPTH_TEST);
+                            cam_state.reset(new pangolin::OpenGlRenderState(
+                                pangolin::ProjectionMatrix(1024, 768, 500, 500, 512, 384, 0.1, 1000),
+                                pangolin::ModelViewLookAt(0, -5, -10, 0, 0, 0, pangolin::AxisNegY)));
+                            view3d = &pangolin::CreateDisplay()
+                                          .SetBounds(0.0, 1.0, 0.0, 1.0)
+                                          .SetHandler(new pangolin::Handler3D(*cam_state));
+                            pango_init = true;
                         }
-                        if (!shutDownFlag.load()) {
-                            *globalMap = *filtered;
+                        catch (...)
+                        {
+                            pango_init = false;
                         }
-                        t1 = std::chrono::steady_clock::now();
-                        // std::cout << "[DEBUG viewer] voxel done, points=" << globalMap->points.size()
-                                //   << " (" << std::chrono::duration_cast<std::chrono::milliseconds>(t1-t0).count() << "ms)" << std::endl;
                     }
 
-                    // Step 2: Simple statistical outlier removal
-                    if (globalMap->points.size() > static_cast<size_t>(meank)) {
-                        PointCloud::Ptr filtered(new PointCloud());
-                        filtered->points.reserve(globalMap->points.size());
-                        // Build a simple spatial hash for neighbor search
-                        float search_radius = resolution * 3.0f;
-                        auto cell_hash = [search_radius](float x, float y, float z) -> uint64_t {
-                            int64_t ix = static_cast<int64_t>(std::floor(x / search_radius));
-                            int64_t iy = static_cast<int64_t>(std::floor(y / search_radius));
-                            int64_t iz = static_cast<int64_t>(std::floor(z / search_radius));
-                            uint64_t h = 14695981039346656037ULL;
-                            h = (h ^ static_cast<uint64_t>(ix)) * 1099511628211ULL;
-                            h = (h ^ static_cast<uint64_t>(iy)) * 1099511628211ULL;
-                            h = (h ^ static_cast<uint64_t>(iz)) * 1099511628211ULL;
-                            return h;
-                        };
-                        std::unordered_map<uint64_t, std::vector<size_t>> cells;
-                        for (size_t i = 0; i < globalMap->points.size(); i++) {
-                            const auto& pt = globalMap->points[i];
-                            uint64_t key = cell_hash(pt.x, pt.y, pt.z);
-                            cells[key].push_back(i);
-                        }
-                        // Filter: keep points with enough neighbors in adjacent cells
-                        for (size_t i = 0; i < globalMap->points.size() && !shutDownFlag.load(); i++) {
-                            const auto& pt = globalMap->points[i];
-                            uint64_t base_key = cell_hash(pt.x, pt.y, pt.z);
-                            int neighbors = 0;
-                            // Check 3x3x3 cell neighborhood
-                            for (int dx = -1; dx <= 1 && neighbors < meank; dx++) {
-                                for (int dy = -1; dy <= 1 && neighbors < meank; dy++) {
-                                    for (int dz = -1; dz <= 1 && neighbors < meank; dz++) {
-                                        int64_t ix = static_cast<int64_t>(std::floor(pt.x / search_radius)) + dx;
-                                        int64_t iy = static_cast<int64_t>(std::floor(pt.y / search_radius)) + dy;
-                                        int64_t iz = static_cast<int64_t>(std::floor(pt.z / search_radius)) + dz;
-                                        uint64_t h = 14695981039346656037ULL;
-                                        h = (h ^ static_cast<uint64_t>(ix)) * 1099511628211ULL;
-                                        h = (h ^ static_cast<uint64_t>(iy)) * 1099511628211ULL;
-                                        h = (h ^ static_cast<uint64_t>(iz)) * 1099511628211ULL;
-                                        auto it = cells.find(h);
-                                        if (it != cells.end()) neighbors += it->second.size();
-                                    }
+                    if (pango_init)
+                    {
+                        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+                        view3d->Activate(*cam_state);
+                        pangolin::glDrawAxis(0.2f);
+
+                        if (!keyframes.empty())
+                        {
+                            size_t start = (keyframes.size() > 100) ? keyframes.size() - 100 : 0;
+                            for (size_t i = start; i < keyframes.size(); i++)
+                            {
+                                if (keyframes[i] && !keyframes[i]->isBad())
+                                {
+                                    pangolin::OpenGlMatrix Twc(keyframes[i]->GetPoseInverse().matrix());
+                                    glPushMatrix();
+                                    glMultMatrixd(Twc.m);
+                                    // Draw RGB axes at each camera pose
+                                    const float s = 0.08f;
+                                    glLineWidth(2.0f);
+                                    glBegin(GL_LINES);
+                                    glColor3f(1, 0, 0);
+                                    glVertex3f(0, 0, 0);
+                                    glVertex3f(s, 0, 0);
+                                    glColor3f(0, 1, 0);
+                                    glVertex3f(0, 0, 0);
+                                    glVertex3f(0, s, 0);
+                                    glColor3f(0, 0, 1);
+                                    glVertex3f(0, 0, 0);
+                                    glVertex3f(0, 0, s);
+                                    glEnd();
+                                    glPopMatrix();
                                 }
                             }
-                            if (neighbors >= meank) {
-                                filtered->points.push_back(pt);
-                            }
                         }
-                        if (!shutDownFlag.load()) {
-                            *globalMap = *filtered;
-                            // viewer.showCloud(globalMap);
-                        }
-                        auto t2 = std::chrono::steady_clock::now();
-                        // std::cout << "[DEBUG viewer] outlier done, points=" << globalMap->points.size()
-                                //   << " (" << std::chrono::duration_cast<std::chrono::milliseconds>(t2-t1).count() << "ms)" << std::endl;
-                    }
-                    else {
-                        // std::cout << "[DEBUG viewer] too few points for outlier filter, skipped" << std::endl;
+
+                        pangolin::FinishFrame();
                     }
                 }
-                // std::cout << "[DEBUG viewer] tmp clouds released" << std::endl;
                 lastKeyframeSize = N;
                 // std::cout << "[DEBUG viewer] === loop end, lastKeyframeSize=" << lastKeyframeSize << " ===" << std::endl;
             }
@@ -584,6 +558,83 @@ namespace ORB_SLAM3
             }
         }
         // std::cout << "[DEBUG viewer] thread exiting" << std::endl;
+    }
+
+    void PointCloudMapping::VoxelFilter(PointCloud::Ptr& cloud)
+    {
+        if (!cloud || cloud->points.empty()) return;
+        auto voxel_hash = [this](const PointT& pt) -> uint64_t {
+            int64_t ix = static_cast<int64_t>(std::floor(pt.x / resolution));
+            int64_t iy = static_cast<int64_t>(std::floor(pt.y / resolution));
+            int64_t iz = static_cast<int64_t>(std::floor(pt.z / resolution));
+            uint64_t h = 14695981039346656037ULL;
+            h = (h ^ static_cast<uint64_t>(ix)) * 1099511628211ULL;
+            h = (h ^ static_cast<uint64_t>(iy)) * 1099511628211ULL;
+            h = (h ^ static_cast<uint64_t>(iz)) * 1099511628211ULL;
+            return h;
+        };
+        auto voxel_equal = [this](const PointT& a, const PointT& b) -> bool {
+            int64_t ax = static_cast<int64_t>(std::floor(a.x / resolution));
+            int64_t ay = static_cast<int64_t>(std::floor(a.y / resolution));
+            int64_t az = static_cast<int64_t>(std::floor(a.z / resolution));
+            int64_t bx = static_cast<int64_t>(std::floor(b.x / resolution));
+            int64_t by = static_cast<int64_t>(std::floor(b.y / resolution));
+            int64_t bz = static_cast<int64_t>(std::floor(b.z / resolution));
+            return ax == bx && ay == by && az == bz;
+        };
+        std::unordered_map<PointT, bool, decltype(voxel_hash), decltype(voxel_equal)> voxel_map(1024, voxel_hash, voxel_equal);
+        PointCloud::Ptr filtered(new PointCloud());
+        filtered->points.reserve(cloud->points.size() / 10);
+        for (const auto& pt : cloud->points) {
+            if (shutDownFlag.load()) break;
+            if (voxel_map.find(pt) == voxel_map.end()) {
+                voxel_map[pt] = true;
+                filtered->points.push_back(pt);
+            }
+        }
+        if (!shutDownFlag.load()) *cloud = *filtered;
+    }
+
+    void PointCloudMapping::OutlierFilter(PointCloud::Ptr& cloud)
+    {
+        if (!cloud || cloud->points.size() <= static_cast<size_t>(meank)) return;
+        PointCloud::Ptr filtered(new PointCloud());
+        filtered->points.reserve(cloud->points.size());
+        float sr = resolution * 3.0f;
+        auto cell_hash = [sr](float x, float y, float z) -> uint64_t {
+            int64_t ix = static_cast<int64_t>(std::floor(x / sr));
+            int64_t iy = static_cast<int64_t>(std::floor(y / sr));
+            int64_t iz = static_cast<int64_t>(std::floor(z / sr));
+            uint64_t h = 14695981039346656037ULL;
+            h = (h ^ static_cast<uint64_t>(ix)) * 1099511628211ULL;
+            h = (h ^ static_cast<uint64_t>(iy)) * 1099511628211ULL;
+            h = (h ^ static_cast<uint64_t>(iz)) * 1099511628211ULL;
+            return h;
+        };
+        std::unordered_map<uint64_t, std::vector<size_t>> cells;
+        for (size_t i = 0; i < cloud->points.size(); i++) {
+            cells[cell_hash(cloud->points[i].x, cloud->points[i].y, cloud->points[i].z)].push_back(i);
+        }
+        for (size_t i = 0; i < cloud->points.size() && !shutDownFlag.load(); i++) {
+            const auto& pt = cloud->points[i];
+            uint64_t base_key = cell_hash(pt.x, pt.y, pt.z);
+            int neighbors = 0;
+            for (int dx = -1; dx <= 1 && neighbors < meank; dx++)
+                for (int dy = -1; dy <= 1 && neighbors < meank; dy++)
+                    for (int dz = -1; dz <= 1 && neighbors < meank; dz++) {
+                        int64_t ix = static_cast<int64_t>(std::floor(pt.x / sr)) + dx;
+                        int64_t iy = static_cast<int64_t>(std::floor(pt.y / sr)) + dy;
+                        int64_t iz = static_cast<int64_t>(std::floor(pt.z / sr)) + dz;
+                        uint64_t h = 14695981039346656037ULL;
+                        h = (h ^ static_cast<uint64_t>(ix)) * 1099511628211ULL;
+                        h = (h ^ static_cast<uint64_t>(iy)) * 1099511628211ULL;
+                        h = (h ^ static_cast<uint64_t>(iz)) * 1099511628211ULL;
+                        auto it = cells.find(h);
+                        if (it != cells.end()) neighbors += it->second.size();
+                    }
+            if (neighbors >= meank) filtered->points.push_back(pt);
+        }
+        if (!shutDownFlag.load()) *cloud = *filtered;
     }
 
     // save the point cloud to ply

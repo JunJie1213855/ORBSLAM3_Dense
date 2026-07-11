@@ -98,6 +98,10 @@ namespace ORB_SLAM3
         // the difference bewteen the front one is that the input include the disparity image
         PointCloud::Ptr GetPointCloud(KeyFrame *kf, cv::Mat &left, cv::Mat &right, cv::Mat &disp, cv::Mat &Q);
 
+        // Manual filters (bypass PCL bugs with in-place filtering)
+        void VoxelFilter(PointCloud::Ptr& cloud);
+        void OutlierFilter(PointCloud::Ptr& cloud);
+
     public:
         // to judge the sensor is rgbd or stereo
         MappingSensor mSensor;

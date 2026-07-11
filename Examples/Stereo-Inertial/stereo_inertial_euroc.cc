@@ -28,6 +28,16 @@
 
 
 #include<System.h>
+#include <csignal>
+#include <atomic>
+
+static std::atomic<bool> g_bShutdown(false);
+
+static void sigint_handler(int)
+{
+    std::cout << "\n[Ctrl+C] shutting down..." << std::endl;
+    g_bShutdown.store(true);
+}
 #include "ImuTypes.h"
 #include "Optimizer.h"
 
@@ -128,6 +138,9 @@ int main(int argc, char **argv)
     cout << endl << "-------" << endl;
     cout.precision(17);
 
+    // Register Ctrl+C handler for clean shutdown
+    signal(SIGINT, sigint_handler);
+
     // Create SLAM system. It initializes all system threads and gets ready to process frames.
     ORB_SLAM3::System SLAM(argv[1],argv[2],ORB_SLAM3::System::IMU_STEREO, true);
 
@@ -181,6 +194,9 @@ int main(int argc, char **argv)
             std::chrono::monotonic_clock::time_point t1 = std::chrono::monotonic_clock::now();
     #endif
 
+            // Check Ctrl+C
+            if (g_bShutdown.load()) break;
+
             // Pass the images to the SLAM system
             SLAM.TrackStereo(imLeft,imRight,tframe,vImuMeas);
 
@@ -210,6 +226,8 @@ int main(int argc, char **argv)
                 usleep((T-ttrack)*1e6); // 1e6
         }
 
+        if (g_bShutdown.load()) break;
+
         if(seq < num_seq - 1)
         {
             cout << "Changing the dataset" << endl;
@@ -221,6 +239,8 @@ int main(int argc, char **argv)
     }
     // Stop all threads
     SLAM.Shutdown();
+    SLAM.SaveTrajectoryEuRoC("CameraTrajectory.txt");
+    SLAM.SaveKeyFrameTrajectoryEuRoC("KeyFrameTrajectory.txt");
 
 
     // Save camera trajectory
