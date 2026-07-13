@@ -33,9 +33,12 @@
 
 static std::atomic<bool> g_bShutdown(false);
 
-static void sigint_handler(int)
+static void signal_handler(int sig)
 {
-    std::cout << "\n[Ctrl+C] shutting down..." << std::endl;
+    const char* name = (sig == SIGINT)  ? "SIGINT(Ctrl+C)" :
+                       (sig == SIGTERM) ? "SIGTERM(kill)" :
+                       (sig == SIGQUIT) ? "SIGQUIT" : "signal";
+    std::cout << "\n[" << name << "] shutting down gracefully..." << std::endl;
     g_bShutdown.store(true);
 }
 #include "ImuTypes.h"
@@ -138,8 +141,10 @@ int main(int argc, char **argv)
     cout << endl << "-------" << endl;
     cout.precision(17);
 
-    // Register Ctrl+C handler for clean shutdown
-    signal(SIGINT, sigint_handler);
+    // Register signal handlers for clean shutdown (Ctrl+C / kill / kill -3)
+    signal(SIGINT,  signal_handler);
+    signal(SIGTERM, signal_handler);
+    signal(SIGQUIT, signal_handler);
 
     // Create SLAM system. It initializes all system threads and gets ready to process frames.
     ORB_SLAM3::System SLAM(argv[1],argv[2],ORB_SLAM3::System::IMU_STEREO, true);
