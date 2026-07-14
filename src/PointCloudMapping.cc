@@ -738,6 +738,12 @@ namespace ORB_SLAM3
             pangolin::FinishFrame();
             std::this_thread::sleep_for(std::chrono::milliseconds(15));
         }
+
+        // Explicitly release Pangolin resources while libpango_display.so is
+        // still loaded and GL context is valid. Handler3D+Display+GlFont are
+        // freed here instead of during _dl_fini where the GL context is gone.
+        view3d = nullptr;
+        cam_state.reset();
     }
 
     // save the point cloud to ply

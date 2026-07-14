@@ -1,6 +1,6 @@
 # Ignore all
-# 
 .codegraph
+ROS2Humble/.codegraph
 ROS2Humble/config
 build
 weights
