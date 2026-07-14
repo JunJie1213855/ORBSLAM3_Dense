@@ -410,33 +410,32 @@ namespace ORB_SLAM3
                 std::vector<cv::Mat> local_colors, local_rights, local_depths, local_disps;
                 cv::Mat local_Q;
                 {
-                    // std::cout << "[DEBUG viewer] waiting for keyframes..." << std::endl;
+                    // wait_for 100ms: even without new KFs, refresh pose snapshot
+                    // so the render thread's follow-camera doesn't freeze
                     unique_lock<mutex> lck_keyframeUpdated(keyFrameUpdateMutex);
-                    keyFrameUpdated.wait(lck_keyframeUpdated, [this]()
-                                         { return shutDownFlag.load() || lastKeyframeSize < keyframes.size(); });
+                    bool got_kf = keyFrameUpdated.wait_for(lck_keyframeUpdated,
+                        std::chrono::milliseconds(100),
+                        [this](){ return shutDownFlag.load() || lastKeyframeSize < keyframes.size(); });
                     if (shutDownFlag.load())
-                    {
-                        // std::cout << "[DEBUG viewer] shutdown flag set, exiting" << std::endl;
                         break;
-                    }
                     N = keyframes.size();
-                    // std::cout << "[DEBUG viewer] woke up, total KFs=" << N << ", new KFs=" << (N - lastKeyframeSize) << std::endl;
-                    for (size_t i = lastKeyframeSize; i < N; i++)
+                    if (got_kf)
                     {
-                        // std::cout << "[DEBUG viewer] copying KF[" << i << "] id=" << keyframes[i]->mnId << std::endl;
-                        local_kfs.push_back(keyframes[i]);
-                        local_colors.push_back(colorImgs[i].clone());
-                        if (mSensor == MappingSensor::RGBD)
-                            local_depths.push_back(depthImgs[i].clone());
-                        else if (mSensor == MappingSensor::STEREO)
+                        for (size_t i = lastKeyframeSize; i < N; i++)
                         {
-                            local_rights.push_back(rightImgs[i].clone());
-                            if (!dispImgs.empty())
-                                local_disps.push_back(dispImgs[i].clone());
+                            local_kfs.push_back(keyframes[i]);
+                            local_colors.push_back(colorImgs[i].clone());
+                            if (mSensor == MappingSensor::RGBD)
+                                local_depths.push_back(depthImgs[i].clone());
+                            else if (mSensor == MappingSensor::STEREO)
+                            {
+                                local_rights.push_back(rightImgs[i].clone());
+                                if (!dispImgs.empty())
+                                    local_disps.push_back(dispImgs[i].clone());
+                            }
                         }
+                        local_Q = Q.clone();
                     }
-                    local_Q = Q.clone();
-                    // std::cout << "[DEBUG viewer] data copied, lock released" << std::endl;
                 }
                 // Generate point clouds for the new keyframes into a temp cloud
                 PointCloud::Ptr newCloud(new PointCloud());
@@ -496,6 +495,9 @@ namespace ORB_SLAM3
                     mbCloudUpdated.store(true);
                 }
 
+                // IMPORTANT: always refresh pose snapshot (even without new KFs)
+                // so the render thread's follow-camera keeps tracking the latest
+                // known pose rather than freezing at the last keyframe.
                 // Snapshot recent poses for the render thread
                 {
                     std::vector<Eigen::Matrix4f, Eigen::aligned_allocator<Eigen::Matrix4f>> poses;

@@ -142,7 +142,9 @@ int main(int argc, char **argv)
     SLAM.SaveTrajectoryTUM("CameraTrajectory.txt");
     SLAM.SaveKeyFrameTrajectoryTUM("KeyFrameTrajectory.txt");
 
-    return 0;
+    // exit(0) avoids Pangolin global destructor crash (glDeleteTextures
+    // after GL context already destroyed). All data saved at this point.
+    std::exit(0);
 }
 
 void LoadImages(const string &strAssociationFilename, vector<string> &vstrImageFilenamesRGB,
